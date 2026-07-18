@@ -107,21 +107,10 @@ class AlarmService : Service() {
                 stopSelf()
             }
             ACTION_NOTIFICATION_DISMISSED -> {
-                val silencedValue = intent?.getBooleanExtra("SILENCED", false) ?: false
-                Log.d(TAG, "Notification swiped/dismissed: eventId=$eventId, isWorkday=$isWorkday, silenced=$silencedValue")
-                if (isWorkday) {
-                    // Re-post the notification to make it truly sticky and non-dismissible!
-                    val notification = buildAlarmNotification(eventId, eventTitle, reminderLabel, isWorkday, silencedValue)
-                    val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    notificationManager.notify(NOTIFICATION_ID, notification)
-                    Log.d(TAG, "Re-posted sticky workday notification after swipe dismiss attempt.")
-                } else {
-                    // For non-workday events, swiping stops the service, silences, and dismisses
-                    Log.d(TAG, "Non-workday notification dismissed. Stopping service.")
-                    stopAlarmSound()
-                    stopVibration()
-                    stopSelf()
-                }
+                Log.d(TAG, "Notification swiped/dismissed: stopping alarm service.")
+                stopAlarmSound()
+                stopVibration()
+                stopSelf()
             }
         }
 
@@ -272,8 +261,8 @@ class AlarmService : Service() {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setOngoing(true)
-            .setAutoCancel(false)
+            .setOngoing(false)
+            .setAutoCancel(true)
             .setColor(0xFF4F378B.toInt())
             .setColorized(true)
 
@@ -302,7 +291,7 @@ class AlarmService : Service() {
                 builder.setContentTitle(title)
                     .setContentText("Workday event: mark email sent to dismiss.")
                     .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-                    .setOngoing(true) // Cannot be dismissed by user swiping
+                    .setOngoing(false)
 
                 // Button to mark sent and fully dismiss
                 val markSentIntent = Intent(this, AlarmService::class.java).apply {
@@ -328,7 +317,7 @@ class AlarmService : Service() {
                 builder.setContentTitle(title)
                     .setContentText("Workday Event! Email is required.")
                     .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-                    .setOngoing(true)
+                    .setOngoing(false)
 
                 // Button to silence sound
                 val silenceIntent = Intent(this, AlarmService::class.java).apply {
@@ -395,7 +384,7 @@ class AlarmService : Service() {
             builder.setContentTitle(title)
                 .setContentText("Appointment reminder: $reminderLabel")
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-                .setOngoing(true)
+                .setOngoing(false)
 
             // Button to Snooze
             val snoozeIntent = Intent(this, AlarmService::class.java).apply {

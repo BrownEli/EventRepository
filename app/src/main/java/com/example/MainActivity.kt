@@ -216,11 +216,11 @@ fun MainScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         // Cosmic Banner
                         item {
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -271,61 +271,78 @@ fun MainScreen(
 
                         // Section header with Sync Controls & Active Badge
                         item {
-                            Row(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                    .padding(top = 2.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Column {
-                                    Text(
-                                        text = "Scheduled Alarms List",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = polishColors.primary
-                                    )
-                                    Text(
-                                        text = "Showing upcoming events (next 3 weeks). Alarms active for next 2 weeks.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = polishColors.onSurfaceVariant.copy(alpha = 0.7f)
-                                    )
-                                }
                                 Row(
+                                    modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    IconButton(
-                                        onClick = {
-                                            viewModel.syncGoogleCalendar(context) { count ->
-                                                if (count > 0) {
-                                                    Toast.makeText(context, "Successfully synced $count new calendar events!", Toast.LENGTH_LONG).show()
-                                                } else if (count == 0) {
-                                                    Toast.makeText(context, "Calendar synced. No new events found.", Toast.LENGTH_SHORT).show()
-                                                } else if (count == -1) {
-                                                    Toast.makeText(context, "Please grant Calendar permission to sync.", Toast.LENGTH_LONG).show()
-                                                } else {
-                                                    Toast.makeText(context, "Calendar sync failed.", Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
-                                        }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Sync,
-                                            contentDescription = "Sync with Google Calendar",
-                                            tint = polishColors.primary
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Scheduled Alarms List",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = polishColors.primary
+                                        )
+                                        Text(
+                                            text = "Showing upcoming events (next 3 weeks). Alarms active for next 2 weeks.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = polishColors.onSurfaceVariant.copy(alpha = 0.7f)
                                         )
                                     }
                                     Badge(
-                                        containerColor = polishColors.primary.copy(alpha = 0.2f),
+                                        containerColor = polishColors.primary.copy(alpha = 0.15f),
                                         contentColor = polishColors.primary
                                     ) {
                                         Text(
                                             text = "${filteredEvents.size} Events",
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                            fontWeight = FontWeight.Bold
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.labelMedium
                                         )
                                     }
+                                }
+
+                                // Prominent, beautiful Sync button underneath the title headers
+                                Button(
+                                    onClick = {
+                                        viewModel.syncGoogleCalendar(context) { count ->
+                                            if (count > 0) {
+                                                Toast.makeText(context, "Successfully synced $count new calendar events!", Toast.LENGTH_LONG).show()
+                                            } else if (count == 0) {
+                                                Toast.makeText(context, "Calendar synced. No new events found.", Toast.LENGTH_SHORT).show()
+                                            } else if (count == -1) {
+                                                Toast.makeText(context, "Please grant Calendar permission to sync.", Toast.LENGTH_LONG).show()
+                                            } else {
+                                                Toast.makeText(context, "Calendar sync failed.", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("sync_calendar_prominent_button"),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = polishColors.primary,
+                                        contentColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Sync,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Sync with Google Calendar",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
                                 }
                             }
                         }
