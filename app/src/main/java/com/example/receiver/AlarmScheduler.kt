@@ -27,6 +27,22 @@ class AlarmScheduler(private val context: Context) {
 
     fun scheduleAlarmsForEvent(event: Event) {
         val currentTime = System.currentTimeMillis()
+        
+        // Skip past events and clean up any remaining alarms
+        if (event.dateTimeMillis < currentTime) {
+            Log.d(TAG, "Event ${event.id} has already passed. Cancelling alarms.")
+            cancelAlarmsForEvent(event)
+            return
+        }
+        
+        // Limit active alarms to events within 2 weeks (14 days) in the future
+        val maxAlarmWindow = currentTime + 14L * 24 * 60 * 60 * 1000
+        if (event.dateTimeMillis > maxAlarmWindow && event.id != -999) {
+            Log.d(TAG, "Event ${event.id} is more than 2 weeks away. Cancelling any previously scheduled alarms.")
+            cancelAlarmsForEvent(event)
+            return
+        }
+
         val reminders = getReminderTypes(event.dateTimeMillis)
 
         for ((label, triggerTime, codeOffset) in reminders) {

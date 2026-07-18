@@ -136,10 +136,10 @@ fun MainScreen(
     val polishColors = LocalPolishColors.current
     var selectedTab by remember { mutableStateOf(0) }
     val now = System.currentTimeMillis()
-    val threeWeeksAgo = now - 3L * 7 * 24 * 60 * 60 * 1000
     
     val filteredEvents = remember(events) {
-        events.filter { it.dateTimeMillis >= threeWeeksAgo }
+        val nowTime = System.currentTimeMillis()
+        events.filter { it.dateTimeMillis >= nowTime && it.dateTimeMillis <= nowTime + 3L * 7 * 24 * 60 * 60 * 1000 }
     }
 
     Column(
@@ -211,7 +211,7 @@ fun MainScreen(
         ) {
             when (selectedTab) {
                 0 -> {
-                    // TAB 0: Upcoming & Past Events (up to 3 weeks back)
+                    // TAB 0: Upcoming Events (next 3 weeks)
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
@@ -286,7 +286,7 @@ fun MainScreen(
                                         color = polishColors.primary
                                     )
                                     Text(
-                                        text = "Showing up to 3 weeks back. Alarms active for future.",
+                                        text = "Showing upcoming events (next 3 weeks). Alarms active for next 2 weeks.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = polishColors.onSurfaceVariant.copy(alpha = 0.7f)
                                     )
@@ -911,19 +911,19 @@ fun EventItemCard(
                             modifier = Modifier.weight(1f, fill = false)
                         )
                         
-                        // Dynamic PASSED / ACTIVE Event Badge
-                        val hasPassed = event.dateTimeMillis < currentTime
-                        val badgeBg = if (hasPassed) {
-                            polishColors.border.copy(alpha = 0.5f)
-                        } else {
+                        // Dynamic ALARM ACTIVE / QUEUED Badge depending on the 2-week window
+                        val isWithinTwoWeeks = event.dateTimeMillis <= currentTime + 14L * 24 * 60 * 60 * 1000
+                        val badgeBg = if (isWithinTwoWeeks) {
                             polishColors.primary.copy(alpha = 0.15f)
-                        }
-                        val badgeTextColor = if (hasPassed) {
-                            polishColors.onSurfaceVariant.copy(alpha = 0.8f)
                         } else {
-                            polishColors.primary
+                            polishColors.border.copy(alpha = 0.5f)
                         }
-                        val badgeLabel = if (hasPassed) "PASSED" else "ACTIVE"
+                        val badgeTextColor = if (isWithinTwoWeeks) {
+                            polishColors.primary
+                        } else {
+                            polishColors.onSurfaceVariant.copy(alpha = 0.8f)
+                        }
+                        val badgeLabel = if (isWithinTwoWeeks) "ALARM ACTIVE" else "QUEUED"
                         
                         Box(
                             modifier = Modifier
