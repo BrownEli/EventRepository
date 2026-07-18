@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.Event
 import com.example.ui.EventViewModel
@@ -132,381 +133,475 @@ fun MainScreen(
         }
     }
 
-    // Main scrollable page
-    LazyColumn(
+    val polishColors = LocalPolishColors.current
+    var selectedTab by remember { mutableStateOf(0) }
+    val now = System.currentTimeMillis()
+    val threeWeeksAgo = now - 3L * 7 * 24 * 60 * 60 * 1000
+    
+    val filteredEvents = remember(events) {
+        events.filter { it.dateTimeMillis >= threeWeeksAgo }
+    }
+
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .background(polishColors.background)
     ) {
-        // App Header & Visual Banner
-        item {
-            Spacer(modifier = Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp)
-                    .clip(RoundedCornerShape(16.dp))
-            ) {
-                // Renders the beautifully generated deep space cosmic banner
-                Image(
-                    painter = painterResource(id = R.drawable.img_alarm_header),
-                    contentDescription = "Cosmic Alarm Clock Banner",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+        // Tab Row at the top with elegant Material 3 styling
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = polishColors.surface,
+            contentColor = polishColors.primary,
+            indicator = { tabPositions ->
+                TabRowDefaults.SecondaryIndicator(
+                    Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                    color = polishColors.primary
                 )
-                // Dark overlay gradient for readable text on top of the image
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            androidx.compose.ui.graphics.Brush.verticalGradient(
-                                colors = listOf(
-                                    androidx.compose.ui.graphics.Color.Transparent,
-                                    androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)
-                                )
-                            )
-                        )
-                )
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(16.dp)
-                ) {
+            },
+            divider = {
+                HorizontalDivider(color = polishColors.border.copy(alpha = 0.5f))
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = {
                     Text(
-                        text = "Calendar Event Alarms",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            color = androidx.compose.ui.graphics.Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 24.sp
-                        )
+                        text = "Upcoming Events",
+                        fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
+                        style = MaterialTheme.typography.titleSmall
                     )
+                },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Event,
+                        contentDescription = "Upcoming Events",
+                        tint = if (selectedTab == 0) polishColors.primary else polishColors.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                },
+                modifier = Modifier.testTag("tab_upcoming_events")
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = {
                     Text(
-                        text = "Ring-based alarms for appointments and deadlines",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
-                            fontSize = 13.sp
-                        )
+                        text = "Enter Event",
+                        fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
+                        style = MaterialTheme.typography.titleSmall
                     )
-                }
-            }
-        }
-
-        // Section: Instant Test Alarm Playground
-        item {
-            val polishColors = LocalPolishColors.current
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = polishColors.alarmBg
-                ),
-                border = BorderStroke(1.dp, polishColors.alarmBorder),
-                shape = RoundedCornerShape(28.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Center alarm clock icon with ring details
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .background(polishColors.background, RoundedCornerShape(32.dp))
-                            .padding(4.dp)
-                            .background(polishColors.alarmBorder.copy(alpha = 0.3f), RoundedCornerShape(28.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Alarm,
-                            contentDescription = "Active Alarm",
-                            tint = polishColors.alarmText,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Red Badge
-                    Box(
-                        modifier = Modifier
-                            .background(polishColors.alarmText, RoundedCornerShape(12.dp))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "PLAYGROUND PREVIEW",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Instant Test Alarm Playground",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = polishColors.alarmText,
-                        textAlign = TextAlign.Center
+                },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.AddCircleOutline,
+                        contentDescription = "Enter Event",
+                        tint = if (selectedTab == 1) polishColors.primary else polishColors.onSurfaceVariant.copy(alpha = 0.7f)
                     )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Text(
-                        text = "Set a 5-second delay test alarm and lock your screen or go home to experience the alarm ringtone and sticky email checklist.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = polishColors.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 16.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    var testTitle by remember { mutableStateOf("Quick Workday Sync Task") }
-                    var testIsWorkday by remember { mutableStateOf(true) }
-
-                    OutlinedTextField(
-                        value = testTitle,
-                        onValueChange = { testTitle = it },
-                        label = { Text("Test Event Title", color = polishColors.onSurfaceVariant) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = polishColors.alarmText,
-                            unfocusedBorderColor = polishColors.alarmBorder,
-                            focusedLabelColor = polishColors.alarmText,
-                            cursorColor = polishColors.alarmText
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Workday Event? (Sticky Email Prompt)",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = polishColors.text
-                        )
-                        Switch(
-                            checked = testIsWorkday,
-                            onCheckedChange = { testIsWorkday = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = polishColors.alarmText,
-                                uncheckedThumbColor = polishColors.alarmBorder,
-                                uncheckedTrackColor = polishColors.background
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                viewModel.triggerInstantTestAlarm(testTitle, testIsWorkday)
-                                Toast.makeText(context, "Test alarm set for 5s from now!", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier
-                                .weight(1.2f)
-                                .testTag("trigger_test_alarm_button"),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = polishColors.alarmText,
-                                contentColor = Color.White
-                            ),
-                            shape = RoundedCornerShape(24.dp),
-                            contentPadding = PaddingValues(vertical = 12.dp)
-                        ) {
-                            Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Start Alarm")
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.stopActiveAlarmService()
-                                Toast.makeText(context, "Alarm service stopped.", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = polishColors.alarmText
-                            ),
-                            border = BorderStroke(1.dp, polishColors.alarmBorder),
-                            shape = RoundedCornerShape(24.dp),
-                            contentPadding = PaddingValues(vertical = 12.dp)
-                        ) {
-                            Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Stop")
-                        }
-                    }
-                }
-            }
-        }
-
-        // Section: Create Event Form
-        item {
-            CreateEventCard(
-                onAddEvent = { title, desc, time, isWorkday ->
-                    viewModel.addEvent(title, desc, time, isWorkday)
-                    
-                    // Trigger Google Calendar Insert Intent directly!
-                    val calendarIntent = Intent(Intent.ACTION_INSERT).apply {
-                        data = CalendarContract.Events.CONTENT_URI
-                        putExtra(CalendarContract.Events.TITLE, title)
-                        putExtra(CalendarContract.Events.DESCRIPTION, desc + "\n\n[Reminders configured in Calendar Event Alarms app]")
-                        putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, time)
-                        putExtra(CalendarContract.EXTRA_EVENT_END_TIME, time + 60 * 60 * 1000) // 1 hour
-                        putExtra(CalendarContract.Events.ACCESS_LEVEL, CalendarContract.Events.ACCESS_PRIVATE)
-                    }
-                    try {
-                        context.startActivity(calendarIntent)
-                        Toast.makeText(context, "Saved locally & opening Google Calendar!", Toast.LENGTH_LONG).show()
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Saved locally! Google Calendar application not found.", Toast.LENGTH_LONG).show()
-                    }
-                }
+                },
+                modifier = Modifier.testTag("tab_enter_event")
             )
         }
 
-        // Section header for event list
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(
-                        text = "Upcoming Scheduled Alarms",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Auto-syncs from Google Calendar on open",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    IconButton(
-                        onClick = {
-                            viewModel.syncGoogleCalendar(context) { count ->
-                                if (count > 0) {
-                                    Toast.makeText(context, "Successfully synced $count new calendar events!", Toast.LENGTH_LONG).show()
-                                } else if (count == 0) {
-                                    Toast.makeText(context, "Calendar synced. No new events found.", Toast.LENGTH_SHORT).show()
-                                } else if (count == -1) {
-                                    Toast.makeText(context, "Please grant Calendar permission to sync.", Toast.LENGTH_LONG).show()
-                                } else {
-                                    Toast.makeText(context, "Calendar sync failed.", Toast.LENGTH_SHORT).show()
+        // Tab Content view container
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .weight(1f)
+        ) {
+            when (selectedTab) {
+                0 -> {
+                    // TAB 0: Upcoming & Past Events (up to 3 weeks back)
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Cosmic Banner
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(150.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.img_alarm_header),
+                                    contentDescription = "Cosmic Alarm Clock Banner",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                colors = listOf(
+                                                    androidx.compose.ui.graphics.Color.Transparent,
+                                                    androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)
+                                                )
+                                            )
+                                        )
+                                )
+                                Column(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(16.dp)
+                                ) {
+                                    Text(
+                                        text = "Calendar Event Alarms",
+                                        style = MaterialTheme.typography.titleLarge.copy(
+                                            color = androidx.compose.ui.graphics.Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 22.sp
+                                        )
+                                    )
+                                    Text(
+                                        text = "Ring-based alarms for appointments and deadlines",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
+                                            fontSize = 12.sp
+                                        )
+                                    )
                                 }
                             }
                         }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Sync,
-                            contentDescription = "Sync with Google Calendar",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Badge(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ) {
-                        Text(
-                            text = "${events.size} Active",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+
+                        // Section header with Sync Controls & Active Badge
+                        item {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Scheduled Alarms List",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = polishColors.primary
+                                    )
+                                    Text(
+                                        text = "Showing up to 3 weeks back. Alarms active for future.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = polishColors.onSurfaceVariant.copy(alpha = 0.7f)
+                                    )
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.syncGoogleCalendar(context) { count ->
+                                                if (count > 0) {
+                                                    Toast.makeText(context, "Successfully synced $count new calendar events!", Toast.LENGTH_LONG).show()
+                                                } else if (count == 0) {
+                                                    Toast.makeText(context, "Calendar synced. No new events found.", Toast.LENGTH_SHORT).show()
+                                                } else if (count == -1) {
+                                                    Toast.makeText(context, "Please grant Calendar permission to sync.", Toast.LENGTH_LONG).show()
+                                                } else {
+                                                    Toast.makeText(context, "Calendar sync failed.", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Sync,
+                                            contentDescription = "Sync with Google Calendar",
+                                            tint = polishColors.primary
+                                        )
+                                    }
+                                    Badge(
+                                        containerColor = polishColors.primary.copy(alpha = 0.2f),
+                                        contentColor = polishColors.primary
+                                    ) {
+                                        Text(
+                                            text = "${filteredEvents.size} Events",
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Event Cards List
+                        if (filteredEvents.isEmpty()) {
+                            item {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = polishColors.surface.copy(alpha = 0.5f)
+                                    ),
+                                    shape = RoundedCornerShape(20.dp),
+                                    border = BorderStroke(1.dp, polishColors.border.copy(alpha = 0.3f))
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(24.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.EventNote,
+                                            contentDescription = "No events icon",
+                                            tint = polishColors.onSurfaceVariant.copy(alpha = 0.5f),
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "No Scheduled Alarms",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = polishColors.text
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Add an event in 'Enter Event' tab, or sync from your Google Calendar automatically.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = polishColors.onSurfaceVariant,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            items(filteredEvents, key = { it.id }) { event ->
+                                EventItemCard(
+                                    event = event,
+                                    onDelete = { viewModel.deleteEvent(event) },
+                                    onToggleEmail = { viewModel.toggleEmailSent(event) },
+                                    onSyncCalendar = {
+                                        val calendarIntent = Intent(Intent.ACTION_INSERT).apply {
+                                            data = CalendarContract.Events.CONTENT_URI
+                                            putExtra(CalendarContract.Events.TITLE, event.title)
+                                            putExtra(CalendarContract.Events.DESCRIPTION, event.description)
+                                            putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.dateTimeMillis)
+                                            putExtra(CalendarContract.EXTRA_EVENT_END_TIME, event.dateTimeMillis + 60 * 60 * 1000)
+                                        }
+                                        try {
+                                            context.startActivity(calendarIntent)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Google Calendar app not found.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                )
+                            }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(32.dp))
+                        }
                     }
                 }
-            }
-        }
-
-        // List of upcoming events
-        if (events.isEmpty()) {
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(
+                1 -> {
+                    // TAB 1: Enter / Create Event & Instant Alarm Test Playground
+                    LazyColumn(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.EventNote,
-                            contentDescription = "No events icon",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "No Scheduled Alarms",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Add an event above to schedule ringtone alarms 2 weeks, 1 week, 1 day, and 1 minute before the event time.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            // Create Event Card Form
+                            CreateEventCard(
+                                onAddEvent = { title, desc, time, isWorkday ->
+                                    viewModel.addEvent(title, desc, time, isWorkday)
+                                    
+                                    // Trigger Google Calendar Insert Intent directly!
+                                    val calendarIntent = Intent(Intent.ACTION_INSERT).apply {
+                                        data = CalendarContract.Events.CONTENT_URI
+                                        putExtra(CalendarContract.Events.TITLE, title)
+                                        putExtra(CalendarContract.Events.DESCRIPTION, desc + "\n\n[Reminders configured in Calendar Event Alarms app]")
+                                        putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, time)
+                                        putExtra(CalendarContract.EXTRA_EVENT_END_TIME, time + 60 * 60 * 1000) // 1 hour
+                                        putExtra(CalendarContract.Events.ACCESS_LEVEL, CalendarContract.Events.ACCESS_PRIVATE)
+                                    }
+                                    try {
+                                        context.startActivity(calendarIntent)
+                                        Toast.makeText(context, "Saved locally & opening Google Calendar!", Toast.LENGTH_LONG).show()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Saved locally! Google Calendar application not found.", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            )
+                        }
+
+                        // Section: Instant Test Alarm Playground
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = polishColors.alarmBg
+                                ),
+                                border = BorderStroke(1.dp, polishColors.alarmBorder),
+                                shape = RoundedCornerShape(28.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(20.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    // Center alarm clock icon with ring details
+                                    Box(
+                                        modifier = Modifier
+                                            .size(64.dp)
+                                            .background(polishColors.background, RoundedCornerShape(32.dp))
+                                            .padding(4.dp)
+                                            .background(polishColors.alarmBorder.copy(alpha = 0.3f), RoundedCornerShape(28.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Alarm,
+                                            contentDescription = "Active Alarm",
+                                            tint = polishColors.alarmText,
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Red Badge
+                                    Box(
+                                        modifier = Modifier
+                                            .background(polishColors.alarmText, RoundedCornerShape(12.dp))
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "PLAYGROUND PREVIEW",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                letterSpacing = 1.sp
+                                            )
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text(
+                                        text = "Instant Test Alarm Playground",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = polishColors.alarmText,
+                                        textAlign = TextAlign.Center
+                                    )
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Text(
+                                        text = "Set a 5-second delay test alarm and lock your screen or go home to experience the alarm ringtone and sticky email checklist.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = polishColors.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                        lineHeight = 16.sp
+                                    )
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    var testTitle by remember { mutableStateOf("Quick Workday Sync Task") }
+                                    var testIsWorkday by remember { mutableStateOf(true) }
+
+                                    OutlinedTextField(
+                                        value = testTitle,
+                                        onValueChange = { testTitle = it },
+                                        label = { Text("Test Event Title", color = polishColors.onSurfaceVariant) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = polishColors.alarmText,
+                                            unfocusedBorderColor = polishColors.alarmBorder,
+                                            focusedLabelColor = polishColors.alarmText,
+                                            cursorColor = polishColors.alarmText
+                                        )
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = "Workday Event? (Sticky Email)",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = polishColors.text
+                                        )
+                                        Switch(
+                                            checked = testIsWorkday,
+                                            onCheckedChange = { testIsWorkday = it },
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = Color.White,
+                                                checkedTrackColor = polishColors.alarmText,
+                                                uncheckedThumbColor = polishColors.alarmBorder,
+                                                uncheckedTrackColor = polishColors.background
+                                            )
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Button(
+                                            onClick = {
+                                                viewModel.triggerInstantTestAlarm(testTitle, testIsWorkday)
+                                                Toast.makeText(context, "Test alarm set for 5s from now!", Toast.LENGTH_SHORT).show()
+                                            },
+                                            modifier = Modifier
+                                                .weight(1.2f)
+                                                .testTag("trigger_test_alarm_button"),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = polishColors.alarmText,
+                                                contentColor = Color.White
+                                            ),
+                                            shape = RoundedCornerShape(24.dp),
+                                            contentPadding = PaddingValues(vertical = 12.dp)
+                                        ) {
+                                            Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Start Alarm")
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                viewModel.stopActiveAlarmService()
+                                                Toast.makeText(context, "Alarm service stopped.", Toast.LENGTH_SHORT).show()
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = polishColors.alarmText
+                                            ),
+                                            border = BorderStroke(1.dp, polishColors.alarmBorder),
+                                            shape = RoundedCornerShape(24.dp),
+                                            contentPadding = PaddingValues(vertical = 12.dp)
+                                        ) {
+                                            Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Stop")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(32.dp))
+                        }
                     }
                 }
             }
-        } else {
-            items(events, key = { it.id }) { event ->
-                EventItemCard(
-                    event = event,
-                    onDelete = { viewModel.deleteEvent(event) },
-                    onToggleEmail = { viewModel.toggleEmailSent(event) },
-                    onSyncCalendar = {
-                        val calendarIntent = Intent(Intent.ACTION_INSERT).apply {
-                            data = CalendarContract.Events.CONTENT_URI
-                            putExtra(CalendarContract.Events.TITLE, event.title)
-                            putExtra(CalendarContract.Events.DESCRIPTION, event.description)
-                            putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.dateTimeMillis)
-                            putExtra(CalendarContract.EXTRA_EVENT_END_TIME, event.dateTimeMillis + 60 * 60 * 1000)
-                        }
-                        try {
-                            context.startActivity(calendarIntent)
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "Google Calendar app not found.", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                )
-            }
-        }
-
-        item {
-            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
@@ -804,12 +899,47 @@ fun EventItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = event.title,
-                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
-                        fontWeight = FontWeight.Bold,
-                        color = polishColors.text
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = event.title,
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
+                            fontWeight = FontWeight.Bold,
+                            color = polishColors.text,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        
+                        // Dynamic PASSED / ACTIVE Event Badge
+                        val hasPassed = event.dateTimeMillis < currentTime
+                        val badgeBg = if (hasPassed) {
+                            polishColors.border.copy(alpha = 0.5f)
+                        } else {
+                            polishColors.primary.copy(alpha = 0.15f)
+                        }
+                        val badgeTextColor = if (hasPassed) {
+                            polishColors.onSurfaceVariant.copy(alpha = 0.8f)
+                        } else {
+                            polishColors.primary
+                        }
+                        val badgeLabel = if (hasPassed) "PASSED" else "ACTIVE"
+                        
+                        Box(
+                            modifier = Modifier
+                                .background(badgeBg, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = badgeLabel,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                ),
+                                color = badgeTextColor
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = formattedDate,

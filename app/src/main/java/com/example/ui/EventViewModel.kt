@@ -148,8 +148,8 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     
                     val now = System.currentTimeMillis()
-                    // Fetch events starting from 1 day ago to 30 days in the future
-                    val startMillis = now - 24 * 60 * 60 * 1000
+                    // Fetch events starting from 3 weeks ago (21 days) to 30 days in the future
+                    val startMillis = now - 3L * 7 * 24 * 60 * 60 * 1000
                     val endMillis = now + 30L * 24 * 60 * 60 * 1000
                     
                     val selection = "${CalendarContract.Events.DTSTART} >= ? AND ${CalendarContract.Events.DTSTART} <= ? AND ${CalendarContract.Events.DELETED} = 0"
@@ -178,7 +178,7 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                             val dtStart = if (dtStartCol >= 0) c.getLong(dtStartCol) else 0L
                             val calName = if (calNameCol >= 0) c.getString(calNameCol) ?: "" else ""
                             
-                            if (dtStart <= now) continue // skip past events
+                            if (dtStart < now - 3L * 7 * 24 * 60 * 60 * 1000) continue // Skip events older than 3 weeks
                             
                             // Check if it already exists by title and dateTimeMillis
                             val alreadyExists = currentEvents.any { 
