@@ -274,6 +274,8 @@ class AlarmService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setAutoCancel(false)
+            .setColor(0xFF4F378B.toInt())
+            .setColorized(true)
 
         val deleteIntent = Intent(this, AlarmService::class.java).apply {
             action = ACTION_NOTIFICATION_DISMISSED
@@ -294,8 +296,12 @@ class AlarmService : Service() {
         if (isWorkday) {
             if (silenced) {
                 // Alarm sound is stopped, but email is pending - sticky system notification remains
-                builder.setContentTitle("Email Required: $eventTitle")
-                    .setContentText("Workday event: you must mark the notification email as sent to dismiss.")
+                val title = "✉️ Workday Protocol: Mark Email Sent"
+                val body = "🛡️ WORKDAY EXCEPTION RUNNING\n\nEvent: $eventTitle\nStatus: Alarm silenced, but notification remains active.\n\n⚠️ Action Required:\nYou must mark the email to your manager as sent to dismiss this notification completely."
+                
+                builder.setContentTitle(title)
+                    .setContentText("Workday event: mark email sent to dismiss.")
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                     .setOngoing(true) // Cannot be dismissed by user swiping
 
                 // Button to mark sent and fully dismiss
@@ -316,8 +322,12 @@ class AlarmService : Service() {
                 )
             } else {
                 // Ringing alarm
-                builder.setContentTitle("ALARM: $eventTitle ($reminderLabel)")
-                    .setContentText("Workday Event! Email to job is required if it breaks work hours.")
+                val title = "🚨 ALARM: $eventTitle"
+                val body = "⏰ Reminder: $reminderLabel\n\n💼 WORKDAY MODE ACTIVE\nThis is a workday event. Send an email to your job if it breaks standard work hours!"
+                
+                builder.setContentTitle(title)
+                    .setContentText("Workday Event! Email is required.")
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                     .setOngoing(true)
 
                 // Button to silence sound
@@ -379,8 +389,12 @@ class AlarmService : Service() {
             }
         } else {
             // Non-workday alarm
-            builder.setContentTitle("ALARM: $eventTitle")
+            val title = "⏰ ALARM: $eventTitle"
+            val body = "📅 Calendar Event Alarm\nReminder: $reminderLabel\n\nPress Snooze to be reminded in 5 minutes, or Dismiss to turn off."
+            
+            builder.setContentTitle(title)
                 .setContentText("Appointment reminder: $reminderLabel")
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setOngoing(true)
 
             // Button to Snooze

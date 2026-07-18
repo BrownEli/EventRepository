@@ -82,20 +82,53 @@ fun MainScreen(
     val context = LocalContext.current
     val events by viewModel.allEvents.collectAsStateWithLifecycle()
 
-    // Handle runtime permissions for Android 13+ (Post Notifications)
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            Toast.makeText(context, "Notification permission granted!", Toast.LENGTH_SHORT).show()
+    // Handle runtime permissions (Notifications & Calendar)
+    val permissionsToRequest = remember {
+        val list = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            list.add(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+        list.add(android.Manifest.permission.READ_CALENDAR)
+        list.add(android.Manifest.permission.WRITE_CALENDAR)
+        list.toTypedArray()
+    }
+
+    val permissionsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val calendarGranted = results[android.Manifest.permission.READ_CALENDAR] ?: false
+        if (calendarGranted) {
+            viewModel.syncGoogleCalendar(context) { count ->
+                if (count > 0) {
+                    Toast.makeText(context, "Successfully synced $count new calendar events!", Toast.LENGTH_LONG).show()
+                } else if (count == 0) {
+                    Toast.makeText(context, "Calendar synced. No new events found.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        val notifGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            results[android.Manifest.permission.POST_NOTIFICATIONS] ?: false
         } else {
+            true
+        }
+        if (!notifGranted) {
             Toast.makeText(context, "Warning: Alarms require notification permissions to display.", Toast.LENGTH_LONG).show()
         }
     }
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        LaunchedEffect(Unit) {
-            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+    LaunchedEffect(Unit) {
+        permissionsLauncher.launch(permissionsToRequest)
+        
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.READ_CALENDAR
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModel.syncGoogleCalendar(context) { count ->
+                if (count > 0) {
+                    Toast.makeText(context, "Automatically synced $count new events from Google Calendar!", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
@@ -356,20 +389,53 @@ fun MainScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Upcoming Scheduled Alarms",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Badge(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
+                Column {
                     Text(
-                        text = "${events.size} Active",
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        text = "Upcoming Scheduled Alarms",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
                     )
+                    Text(
+                        text = "Auto-syncs from Google Calendar on open",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    IconButton(
+                        onClick = {
+                            viewModel.syncGoogleCalendar(context) { count ->
+                                if (count > 0) {
+                                    Toast.makeText(context, "Successfully synced $count new calendar events!", Toast.LENGTH_LONG).show()
+                                } else if (count == 0) {
+                                    Toast.makeText(context, "Calendar synced. No new events found.", Toast.LENGTH_SHORT).show()
+                                } else if (count == -1) {
+                                    Toast.makeText(context, "Please grant Calendar permission to sync.", Toast.LENGTH_LONG).show()
+                                } else {
+                                    Toast.makeText(context, "Calendar sync failed.", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = "Sync with Google Calendar",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Badge(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ) {
+                        Text(
+                            text = "${events.size} Active",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                 }
             }
         }
