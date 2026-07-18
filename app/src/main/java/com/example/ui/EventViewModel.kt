@@ -186,16 +186,16 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                             }
                             
                             if (!alreadyExists) {
-                                // Find out if it's weekday
+                                // Find out if it's a workday (Sunday to Thursday)
                                 val calendar = Calendar.getInstance().apply { timeInMillis = dtStart }
                                 val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
-                                val isWeekday = dayOfWeek != Calendar.SATURDAY && dayOfWeek != Calendar.SUNDAY
+                                val isWorkdayDay = dayOfWeek != Calendar.FRIDAY && dayOfWeek != Calendar.SATURDAY
                                 
                                 val newEvent = Event(
                                     title = title,
                                     description = desc.ifBlank { "Synced from calendar: $calName" },
                                     dateTimeMillis = dtStart,
-                                    isWorkday = isWeekday,
+                                    isWorkday = isWorkdayDay,
                                     isEmailSent = false
                                 )
                                 val newId = repository.insert(newEvent)

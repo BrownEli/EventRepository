@@ -629,7 +629,6 @@ fun CreateEventCard(
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var isWorkday by remember { mutableStateOf(false) }
 
     val calendar = remember { Calendar.getInstance() }
     var selectedYear by remember { mutableStateOf(calendar.get(Calendar.YEAR)) }
@@ -637,6 +636,11 @@ fun CreateEventCard(
     var selectedDay by remember { mutableStateOf(calendar.get(Calendar.DAY_OF_MONTH)) }
     var selectedHour by remember { mutableStateOf(10) } // Default 10 AM
     var selectedMinute by remember { mutableStateOf(0) }
+
+    var isWorkday by remember {
+        val todayDow = calendar.get(Calendar.DAY_OF_WEEK)
+        mutableStateOf(todayDow != Calendar.FRIDAY && todayDow != Calendar.SATURDAY)
+    }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -651,6 +655,13 @@ fun CreateEventCard(
                 selectedMonth = month
                 selectedDay = dayOfMonth
                 showDatePicker = false
+                
+                // Auto-toggle isWorkday based on Sunday-Thursday workday rules
+                val tempCal = Calendar.getInstance().apply {
+                    set(year, month, dayOfMonth)
+                }
+                val dow = tempCal.get(Calendar.DAY_OF_WEEK)
+                isWorkday = dow != Calendar.FRIDAY && dow != Calendar.SATURDAY
             },
             selectedYear,
             selectedMonth,
@@ -859,7 +870,8 @@ fun CreateEventCard(
                         // Reset form fields
                         title = ""
                         description = ""
-                        isWorkday = false
+                        val todayDow = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
+                        isWorkday = todayDow != Calendar.FRIDAY && todayDow != Calendar.SATURDAY
                     }
                 },
                 modifier = Modifier
