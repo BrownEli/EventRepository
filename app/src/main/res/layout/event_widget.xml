@@ -40,11 +40,12 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <View
+    <ImageView
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#312F36"
-        android:layout_marginBottom="8dp"/>
+        android:layout_marginBottom="8dp"
+        android:contentDescription="divider" />
 
     <!-- Events Container -->
     <LinearLayout

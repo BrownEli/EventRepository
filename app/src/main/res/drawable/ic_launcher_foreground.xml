@@ -1,30 +1,31 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:endX="85.84757"
-                android:endY="92.4963"
-                android:startX="42.9492"
-                android:startY="49.59793"
-                android:type="linear">
-                <item
-                    android:color="#44000000"
-                    android:offset="0.0" />
-                <item
-                    android:color="#00000000"
-                    android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
+    <!-- Centered Alarm Clock Icon inside a 66dp safe zone (typically bounds between 21 and 87) -->
+    <!-- Alarm Clock Body -->
+    <path
+        android:fillColor="#D0BCFF"
+        android:pathData="M54,28c-14.36,0 -26,11.64 -26,26s11.64,26 26,26s26,-11.64 26,-26S68.36,28 54,28zM54,75c-11.58,0 -21,-9.42 -21,-21s9.42,-21 21,-21s21,9.42 21,21S65.58,75 54,75z" />
+    <!-- Clock Hands -->
     <path
         android:fillColor="#FFFFFF"
-        android:fillType="nonZero"
-        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
-        android:strokeWidth="1"
-        android:strokeColor="#00000000" />
+        android:pathData="M53,40h2v14h10v2h-12z" />
+    <!-- Alarm Left Bell / Ear -->
+    <path
+        android:fillColor="#E6E1E5"
+        android:pathData="M24.22,34.42l5.66,-5.66c1.17,1.17 1.83,2.76 1.83,4.44s-0.66,3.27 -1.83,4.44l-5.66,-5.66C23.63,36.5 23.63,35.34 24.22,34.42z" />
+    <!-- Alarm Right Bell / Ear -->
+    <path
+        android:fillColor="#E6E1E5"
+        android:pathData="M83.78,34.42l-5.66,-5.66c-1.17,1.17 -1.83,2.76 -1.83,4.44s0.66,3.27 1.83,4.44l5.66,-5.66C84.37,36.5 84.37,35.34 83.78,34.42z" />
+    <!-- Clock Feet Left -->
+    <path
+        android:fillColor="#E6E1E5"
+        android:pathData="M32.86,76.28l-4.24,4.24c-0.78,0.78 -2.05,0.78 -2.83,0s-0.78,-2.05 0,-2.83l4.24,-4.24" />
+    <!-- Clock Feet Right -->
+    <path
+        android:fillColor="#E6E1E5"
+        android:pathData="M75.14,76.28l4.24,4.24c0.78,0.78 2.05,0.78 2.83,0s0.78,-2.05 0,-2.83l-4.24,-4.24" />
 </vector>

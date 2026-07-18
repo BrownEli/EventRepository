@@ -41,6 +41,7 @@ class AlarmService : Service() {
         const val ACTION_SNOOZE = "com.example.action.SNOOZE_ALARM"
         const val ACTION_MARK_SENT = "com.example.action.MARK_EMAIL_SENT"
         const val ACTION_DISMISS = "com.example.action.DISMISS_ALARM"
+        const val ACTION_NOTIFICATION_DISMISSED = "com.example.action.NOTIFICATION_DISMISSED"
     }
 
     override fun onCreate() {
@@ -104,6 +105,23 @@ class AlarmService : Service() {
                 stopAlarmSound()
                 stopVibration()
                 stopSelf()
+            }
+            ACTION_NOTIFICATION_DISMISSED -> {
+                val silencedValue = intent?.getBooleanExtra("SILENCED", false) ?: false
+                Log.d(TAG, "Notification swiped/dismissed: eventId=$eventId, isWorkday=$isWorkday, silenced=$silencedValue")
+                if (isWorkday) {
+                    // Re-post the notification to make it truly sticky and non-dismissible!
+                    val notification = buildAlarmNotification(eventId, eventTitle, reminderLabel, isWorkday, silencedValue)
+                    val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    notificationManager.notify(NOTIFICATION_ID, notification)
+                    Log.d(TAG, "Re-posted sticky workday notification after swipe dismiss attempt.")
+                } else {
+                    // For non-workday events, swiping stops the service, silences, and dismisses
+                    Log.d(TAG, "Non-workday notification dismissed. Stopping service.")
+                    stopAlarmSound()
+                    stopVibration()
+                    stopSelf()
+                }
             }
         }
 
@@ -254,6 +272,24 @@ class AlarmService : Service() {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)
+            .setAutoCancel(false)
+
+        val deleteIntent = Intent(this, AlarmService::class.java).apply {
+            action = ACTION_NOTIFICATION_DISMISSED
+            putExtra("EVENT_ID", eventId)
+            putExtra("REMINDER_LABEL", reminderLabel)
+            putExtra("EVENT_TITLE", eventTitle)
+            putExtra("IS_WORKDAY", isWorkday)
+            putExtra("SILENCED", silenced)
+        }
+        val deletePendingIntent = PendingIntent.getService(
+            this,
+            eventId * 10 + 107,
+            deleteIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        builder.setDeleteIntent(deletePendingIntent)
 
         if (isWorkday) {
             if (silenced) {
