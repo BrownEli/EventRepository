@@ -784,7 +784,7 @@ fun MainScreen(
                                                 value = nameInput,
                                                 onValueChange = { nameInput = it },
                                                 label = { Text("Display Name") },
-                                                placeholder = { Text("e.g. Elzareez Brown") },
+                                                placeholder = { Text("e.g. Jane Doe") },
                                                 modifier = Modifier.fillMaxWidth().testTag("identity_name_input"),
                                                 singleLine = true,
                                                 shape = RoundedCornerShape(8.dp)
