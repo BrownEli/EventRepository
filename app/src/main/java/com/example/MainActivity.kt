@@ -172,6 +172,7 @@ fun MainScreen(
                             (userEmail.isNotBlank() && calName.contains(userEmail, ignoreCase = true)) ||
                             (emailPrefix.isNotBlank() && calName.contains(emailPrefix, ignoreCase = true)) ||
                             (firstName.isNotBlank() && calName.contains(firstName, ignoreCase = true)) ||
+                            calName.equals("Calendar", ignoreCase = true) ||
                             calName.equals("Birthdays", ignoreCase = true) ||
                             calName.equals("Tasks", ignoreCase = true)
                             

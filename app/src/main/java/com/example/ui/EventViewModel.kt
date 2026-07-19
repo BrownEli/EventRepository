@@ -227,8 +227,68 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                 val addedCount = withContext(Dispatchers.IO) {
                     var count = 0
                     val contentResolver = context.contentResolver
-                    val uri = CalendarContract.Events.CONTENT_URI
                     
+                    // Determine personal calendar IDs and display names from the device
+                    val personalCalendarIds = mutableSetOf<Long>()
+                    val personalCalendarNames = mutableSetOf<String>()
+                    val currentUserEmail = userEmailState.value.trim()
+                    val currentUserName = userNameState.value.trim()
+                    val emailPrefix = if (currentUserEmail.contains("@")) currentUserEmail.substringBefore("@") else ""
+                    val firstName = if (currentUserName.contains(" ")) currentUserName.substringBefore(" ") else currentUserName
+
+                    try {
+                        val calUri = CalendarContract.Calendars.CONTENT_URI
+                        val calProjection = arrayOf(
+                            CalendarContract.Calendars._ID,
+                            CalendarContract.Calendars.ACCOUNT_NAME,
+                            CalendarContract.Calendars.OWNER_ACCOUNT,
+                            CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
+                            CalendarContract.Calendars.IS_PRIMARY
+                        )
+                        contentResolver.query(calUri, calProjection, null, null, null)?.use { cursor ->
+                            val idCol = cursor.getColumnIndex(CalendarContract.Calendars._ID)
+                            val accCol = cursor.getColumnIndex(CalendarContract.Calendars.ACCOUNT_NAME)
+                            val ownerCol = cursor.getColumnIndex(CalendarContract.Calendars.OWNER_ACCOUNT)
+                            val nameCol = cursor.getColumnIndex(CalendarContract.Calendars.CALENDAR_DISPLAY_NAME)
+                            val primaryCol = cursor.getColumnIndex(CalendarContract.Calendars.IS_PRIMARY)
+
+                            while (cursor.moveToNext()) {
+                                val id = if (idCol >= 0) cursor.getLong(idCol) else -1L
+                                val accountName = if (accCol >= 0) cursor.getString(accCol) ?: "" else ""
+                                val ownerAccount = if (ownerCol >= 0) cursor.getString(ownerCol) ?: "" else ""
+                                val displayName = if (nameCol >= 0) cursor.getString(nameCol) ?: "" else ""
+                                val isPrimary = if (primaryCol >= 0) cursor.getInt(primaryCol) == 1 else false
+
+                                val isPersonal = isPrimary ||
+                                        (currentUserEmail.isNotBlank() && (
+                                            accountName.equals(currentUserEmail, ignoreCase = true) ||
+                                            ownerAccount.equals(currentUserEmail, ignoreCase = true) ||
+                                            displayName.contains(currentUserEmail, ignoreCase = true)
+                                        )) ||
+                                        (currentUserName.isNotBlank() && displayName.equals(currentUserName, ignoreCase = true)) ||
+                                        displayName.contains("personal", ignoreCase = true) ||
+                                        displayName.contains("private", ignoreCase = true) ||
+                                        displayName.contains("my calendar", ignoreCase = true) ||
+                                        displayName.equals("Calendar", ignoreCase = true) ||
+                                        displayName.equals("Birthdays", ignoreCase = true) ||
+                                        displayName.equals("Tasks", ignoreCase = true) ||
+                                        (emailPrefix.isNotBlank() && displayName.contains(emailPrefix, ignoreCase = true)) ||
+                                        (firstName.isNotBlank() && displayName.contains(firstName, ignoreCase = true))
+
+                                if (id != -1L && isPersonal) {
+                                    personalCalendarIds.add(id)
+                                    if (displayName.isNotBlank()) {
+                                        personalCalendarNames.add(displayName.trim().lowercase())
+                                    }
+                                    Log.d("EventViewModel", "Found synced identity/personal calendar: ID=$id, Name=$displayName, Account=$accountName, Primary=$isPrimary")
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("EventViewModel", "Failed to query calendars table: ${e.message}")
+                    }
+
+                    val uri = CalendarContract.Events.CONTENT_URI
                     val projection = arrayOf(
                         CalendarContract.Events._ID,
                         CalendarContract.Events.TITLE,
@@ -236,7 +296,8 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                         CalendarContract.Events.DTSTART,
                         CalendarContract.Events.CALENDAR_DISPLAY_NAME,
                         CalendarContract.Events.EVENT_LOCATION,
-                        CalendarContract.Events.ORGANIZER
+                        CalendarContract.Events.ORGANIZER,
+                        CalendarContract.Events.CALENDAR_ID
                     )
                     
                     val now = System.currentTimeMillis()
@@ -263,6 +324,7 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                         val calNameCol = c.getColumnIndex(CalendarContract.Events.CALENDAR_DISPLAY_NAME)
                         val locCol = c.getColumnIndex(CalendarContract.Events.EVENT_LOCATION)
                         val orgCol = c.getColumnIndex(CalendarContract.Events.ORGANIZER)
+                        val calIdCol = c.getColumnIndex(CalendarContract.Events.CALENDAR_ID)
                         
                         val currentEvents = repository.getAllEventsList()
                         
@@ -273,23 +335,23 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                             val calName = if (calNameCol >= 0) c.getString(calNameCol) ?: "" else ""
                             val location = if (locCol >= 0) c.getString(locCol) ?: "" else ""
                             val organizer = if (orgCol >= 0) c.getString(orgCol) ?: "" else ""
+                            val calId = if (calIdCol >= 0) c.getLong(calIdCol) else -1L
                             
                             if (dtStart < now) continue // Skip passed events completely
                             
                             // Filtering out company-wide events that are not related to the user's email or specific calendar
                             val calendarDisplayName = calName.trim()
-                            val currentUserEmail = userEmailState.value
-                            val currentUserName = userNameState.value
-                            val emailPrefix = currentUserEmail.substringBefore("@")
-                            val firstName = currentUserName.substringBefore(" ")
-
-                            val isPersonalCalendar = (currentUserName.isNotBlank() && calendarDisplayName.equals(currentUserName, ignoreCase = true)) ||
+                            
+                            val isPersonalCalendar = personalCalendarIds.contains(calId) ||
+                                    personalCalendarNames.contains(calendarDisplayName.lowercase()) ||
+                                    (currentUserName.isNotBlank() && calendarDisplayName.equals(currentUserName, ignoreCase = true)) ||
                                     calendarDisplayName.contains("personal", ignoreCase = true) ||
                                     calendarDisplayName.contains("private", ignoreCase = true) ||
                                     calendarDisplayName.contains("my calendar", ignoreCase = true) ||
                                     (currentUserEmail.isNotBlank() && calendarDisplayName.contains(currentUserEmail, ignoreCase = true)) ||
                                     (emailPrefix.isNotBlank() && calendarDisplayName.contains(emailPrefix, ignoreCase = true)) ||
                                     (firstName.isNotBlank() && calendarDisplayName.contains(firstName, ignoreCase = true)) ||
+                                    calendarDisplayName.equals("Calendar", ignoreCase = true) ||
                                     calendarDisplayName.equals("Birthdays", ignoreCase = true) ||
                                     calendarDisplayName.equals("Tasks", ignoreCase = true)
                             
