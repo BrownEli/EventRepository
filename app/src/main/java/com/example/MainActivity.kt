@@ -524,16 +524,57 @@ fun MainScreen(
                                             color = polishColors.onSurfaceVariant.copy(alpha = 0.7f)
                                         )
                                     }
-                                    Badge(
-                                        containerColor = polishColors.primary.copy(alpha = 0.15f),
-                                        contentColor = polishColors.primary
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text(
-                                            text = "${filteredEvents.size} Events",
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                            fontWeight = FontWeight.Bold,
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
+                                        var localIsSyncing by remember { mutableStateOf(false) }
+                                        IconButton(
+                                            onClick = {
+                                                if (!localIsSyncing) {
+                                                    localIsSyncing = true
+                                                    viewModel.syncGoogleCalendar(context) { count ->
+                                                        localIsSyncing = false
+                                                        if (count > 0) {
+                                                            Toast.makeText(context, "Successfully synced $count new calendar events!", Toast.LENGTH_LONG).show()
+                                                        } else if (count == 0) {
+                                                            Toast.makeText(context, "Calendar synced. No new events found.", Toast.LENGTH_SHORT).show()
+                                                        } else if (count == -1) {
+                                                            Toast.makeText(context, "Please grant Calendar permission to sync.", Toast.LENGTH_LONG).show()
+                                                        } else {
+                                                            Toast.makeText(context, "Calendar sync failed.", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier.size(36.dp).testTag("sync_now_button")
+                                        ) {
+                                            if (localIsSyncing) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(18.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = polishColors.primary
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.Default.Sync,
+                                                    contentDescription = "Sync Now",
+                                                    tint = polishColors.primary,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+                                        Badge(
+                                            containerColor = polishColors.primary.copy(alpha = 0.15f),
+                                            contentColor = polishColors.primary
+                                        ) {
+                                            Text(
+                                                text = "${filteredEvents.size} Events",
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                fontWeight = FontWeight.Bold,
+                                                style = MaterialTheme.typography.labelMedium
+                                            )
+                                        }
                                     }
                                 }
                             }

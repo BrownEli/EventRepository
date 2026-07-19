@@ -79,17 +79,8 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
-        // Reset old hardcoded defaults
-        var savedEmail = sharedPrefs.getString("user_email", "") ?: ""
-        var savedName = sharedPrefs.getString("user_name", "") ?: ""
-        if (savedEmail == "elibrown62@gmail.com") {
-            sharedPrefs.edit().remove("user_email").apply()
-            savedEmail = ""
-        }
-        if (savedName == "Elzareez Brown") {
-            sharedPrefs.edit().remove("user_name").apply()
-            savedName = ""
-        }
+        val savedEmail = sharedPrefs.getString("user_email", "") ?: ""
+        val savedName = sharedPrefs.getString("user_name", "") ?: ""
         userEmailState.value = savedEmail
         userNameState.value = savedName
 
@@ -342,6 +333,11 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                             // Filtering out company-wide events that are not related to the user's email or specific calendar
                             val calendarDisplayName = calName.trim()
                             
+                            // Explicitly filter out Birthdays and Tasks calendars
+                            val isBirthdaysCalendar = calendarDisplayName.equals("Birthdays", ignoreCase = true) || 
+                                                      calendarDisplayName.contains("birthday", ignoreCase = true)
+                            val isTasksCalendar = calendarDisplayName.equals("Tasks", ignoreCase = true)
+                            
                             val isPersonalCalendar = personalCalendarIds.contains(calId) ||
                                     personalCalendarNames.contains(calendarDisplayName.lowercase()) ||
                                     (currentUserName.isNotBlank() && calendarDisplayName.equals(currentUserName, ignoreCase = true)) ||
@@ -350,12 +346,9 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                                     calendarDisplayName.contains("my calendar", ignoreCase = true) ||
                                     (currentUserEmail.isNotBlank() && calendarDisplayName.contains(currentUserEmail, ignoreCase = true)) ||
                                     (emailPrefix.isNotBlank() && calendarDisplayName.contains(emailPrefix, ignoreCase = true)) ||
-                                    (firstName.isNotBlank() && calendarDisplayName.contains(firstName, ignoreCase = true)) ||
-                                    calendarDisplayName.equals("Calendar", ignoreCase = true) ||
-                                    calendarDisplayName.equals("Birthdays", ignoreCase = true) ||
-                                    calendarDisplayName.equals("Tasks", ignoreCase = true)
+                                    (firstName.isNotBlank() && calendarDisplayName.contains(firstName, ignoreCase = true))
                             
-                            val isRelatedToUser = (currentUserEmail.isNotBlank() && (
+                            val isRelatedToUserText = (currentUserEmail.isNotBlank() && (
                                     organizer.contains(currentUserEmail, ignoreCase = true) ||
                                     title.contains(currentUserEmail, ignoreCase = true) ||
                                     desc.contains(currentUserEmail, ignoreCase = true) ||
@@ -366,9 +359,61 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                                     location.contains(firstName, ignoreCase = true)
                                 ))
                             
+                            // Check if the user is an attendee of this event
+                            val eventId = if (idCol >= 0) c.getLong(idCol) else -1L
+                            val isUserAttendee = if (eventId != -1L && currentUserEmail.isNotBlank()) {
+                                var found = false
+                                try {
+                                    val attendeesUri = CalendarContract.Attendees.CONTENT_URI
+                                    val attendeesProjection = arrayOf(
+                                        CalendarContract.Attendees.ATTENDEE_EMAIL,
+                                        CalendarContract.Attendees.ATTENDEE_NAME
+                                    )
+                                    val selection = "${CalendarContract.Attendees.EVENT_ID} = ?"
+                                    val selectionArgs = arrayOf(eventId.toString())
+                                    context.contentResolver.query(
+                                        attendeesUri,
+                                        attendeesProjection,
+                                        selection,
+                                        selectionArgs,
+                                        null
+                                    )?.use { attendeeCursor ->
+                                        val emailIdx = attendeeCursor.getColumnIndex(CalendarContract.Attendees.ATTENDEE_EMAIL)
+                                        val nameIdx = attendeeCursor.getColumnIndex(CalendarContract.Attendees.ATTENDEE_NAME)
+                                        while (attendeeCursor.moveToNext()) {
+                                            val attEmail = if (emailIdx >= 0) attendeeCursor.getString(emailIdx) ?: "" else ""
+                                            val attName = if (nameIdx >= 0) attendeeCursor.getString(nameIdx) ?: "" else ""
+                                            if (attEmail.equals(currentUserEmail, ignoreCase = true) ||
+                                                (emailPrefix.isNotBlank() && attEmail.contains(emailPrefix, ignoreCase = true)) ||
+                                                (currentUserName.isNotBlank() && attName.contains(currentUserName, ignoreCase = true))
+                                            ) {
+                                                found = true
+                                                break
+                                            }
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("EventViewModel", "Failed to check attendees for event $eventId: ${e.message}")
+                                }
+                                found
+                            } else {
+                                false
+                            }
+                            
+                            // Filter out vacations / out-of-office events of other people
+                            val isOtherPersonVacation = (title.contains("OOO", ignoreCase = true) || 
+                                                         title.contains("vacation", ignoreCase = true) || 
+                                                         title.contains("out of office", ignoreCase = true) || 
+                                                         title.contains("leave", ignoreCase = true)) && 
+                                                        !isPersonalCalendar && !isUserAttendee && !organizer.equals(currentUserEmail, ignoreCase = true)
+                            
+                            val shouldImport = !isBirthdaysCalendar && !isTasksCalendar && !isOtherPersonVacation && (
+                                isPersonalCalendar || isUserAttendee || organizer.equals(currentUserEmail, ignoreCase = true) || isRelatedToUserText
+                            )
+                            
                             // If it's not a personal calendar AND not specifically related to their email/identity, skip importing
-                            if (!isPersonalCalendar && !isRelatedToUser) {
-                                Log.d("EventViewModel", "Skipping unrelated company event: Title=$title, Calendar=$calName")
+                            if (!shouldImport) {
+                                Log.d("EventViewModel", "Skipping unrelated company event, holiday/birthday, or other vacation: Title=$title, Calendar=$calName")
                                 continue
                             }
                             
