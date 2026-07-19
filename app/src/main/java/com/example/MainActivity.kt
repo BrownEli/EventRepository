@@ -132,6 +132,7 @@ fun MainScreen(
 
     val polishColors = LocalPolishColors.current
     var selectedTab by remember { mutableStateOf(1) }
+    var workTabSelection by remember { mutableStateOf(0) } // 0 = Meets, 1 = Others
     val now = System.currentTimeMillis()
     
     val isWorkEnvironment by viewModel.isWorkEnvironment.collectAsStateWithLifecycle()
@@ -142,6 +143,32 @@ fun MainScreen(
         val nowTime = System.currentTimeMillis()
         val limit = if (isWorkEnvironment) 7L * 24 * 60 * 60 * 1000 else 3L * 7 * 24 * 60 * 60 * 1000
         events.filter { it.dateTimeMillis >= nowTime && it.dateTimeMillis <= nowTime + limit }
+    }
+
+    val meetsEvents = remember(filteredEvents) {
+        filteredEvents.filter { event ->
+            event.isMeeting || 
+            event.description.contains("meet.google.com", ignoreCase = true) || 
+            event.description.contains("google.com", ignoreCase = true) || 
+            event.title.contains("Google Meet", ignoreCase = true)
+        }
+    }
+
+    val otherEvents = remember(filteredEvents) {
+        filteredEvents.filter { event ->
+            !(event.isMeeting || 
+              event.description.contains("meet.google.com", ignoreCase = true) || 
+              event.description.contains("google.com", ignoreCase = true) || 
+              event.title.contains("Google Meet", ignoreCase = true))
+        }
+    }
+
+    val eventsToShow = remember(filteredEvents, isWorkEnvironment, workTabSelection, meetsEvents, otherEvents) {
+        if (isWorkEnvironment) {
+            if (workTabSelection == 0) meetsEvents else otherEvents
+        } else {
+            filteredEvents
+        }
     }
 
     Scaffold(
@@ -569,7 +596,7 @@ fun MainScreen(
                                             contentColor = polishColors.primary
                                         ) {
                                             Text(
-                                                text = "${filteredEvents.size} Events",
+                                                text = "${eventsToShow.size} Events",
                                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                                 fontWeight = FontWeight.Bold,
                                                 style = MaterialTheme.typography.labelMedium
@@ -580,8 +607,75 @@ fun MainScreen(
                             }
                         }
 
+                        // Sub-tabs for Work Mode
+                        if (isWorkEnvironment) {
+                            item {
+                                TabRow(
+                                    selectedTabIndex = workTabSelection,
+                                    containerColor = Color.Transparent,
+                                    contentColor = polishColors.primary,
+                                    indicator = { tabPositions ->
+                                        TabRowDefaults.SecondaryIndicator(
+                                            Modifier.tabIndicatorOffset(tabPositions[workTabSelection]),
+                                            color = polishColors.primary
+                                        )
+                                    },
+                                    modifier = Modifier.padding(vertical = 4.dp).testTag("work_mode_sub_tabs")
+                                ) {
+                                    Tab(
+                                        selected = workTabSelection == 0,
+                                        onClick = { workTabSelection = 0 },
+                                        text = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Videocam,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Text(
+                                                    text = "Meets (${meetsEvents.size})",
+                                                    fontWeight = if (workTabSelection == 0) FontWeight.Bold else FontWeight.Normal,
+                                                    style = MaterialTheme.typography.labelLarge
+                                                )
+                                            }
+                                        },
+                                        selectedContentColor = polishColors.primary,
+                                        unselectedContentColor = polishColors.onSurfaceVariant.copy(alpha = 0.7f),
+                                        modifier = Modifier.testTag("tab_meets")
+                                    )
+                                    Tab(
+                                        selected = workTabSelection == 1,
+                                        onClick = { workTabSelection = 1 },
+                                        text = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Event,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Text(
+                                                    text = "Others (${otherEvents.size})",
+                                                    fontWeight = if (workTabSelection == 1) FontWeight.Bold else FontWeight.Normal,
+                                                    style = MaterialTheme.typography.labelLarge
+                                                )
+                                            }
+                                        },
+                                        selectedContentColor = polishColors.primary,
+                                        unselectedContentColor = polishColors.onSurfaceVariant.copy(alpha = 0.7f),
+                                        modifier = Modifier.testTag("tab_others")
+                                    )
+                                }
+                            }
+                        }
+
                         // Event Cards List
-                        if (filteredEvents.isEmpty()) {
+                        if (eventsToShow.isEmpty()) {
                             item {
                                 Card(
                                     modifier = Modifier
@@ -607,14 +701,22 @@ fun MainScreen(
                                         )
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
-                                            text = "No Scheduled Alarms",
+                                            text = if (isWorkEnvironment) {
+                                                if (workTabSelection == 0) "No Meeting Events" else "No Other Events"
+                                            } else {
+                                                "No Scheduled Alarms"
+                                            },
                                             style = MaterialTheme.typography.bodyLarge,
                                             fontWeight = FontWeight.Bold,
                                             color = polishColors.text
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = "Add an event in 'Enter Event' tab, or sync from your Google Calendar automatically.",
+                                            text = if (isWorkEnvironment) {
+                                                if (workTabSelection == 0) "No events with Google Meets or Google Links attached for this week." else "No other events found for this week."
+                                            } else {
+                                                "Add an event in 'Enter Event' tab, or sync from your Google Calendar automatically."
+                                            },
                                             style = MaterialTheme.typography.bodySmall,
                                             color = polishColors.onSurfaceVariant,
                                             textAlign = TextAlign.Center
@@ -623,7 +725,7 @@ fun MainScreen(
                                 }
                             }
                         } else {
-                            items(filteredEvents, key = { it.id }) { event ->
+                            items(eventsToShow, key = { it.id }) { event ->
                                 EventItemCard(
                                     event = event,
                                     onDelete = { viewModel.deleteEvent(event) },
