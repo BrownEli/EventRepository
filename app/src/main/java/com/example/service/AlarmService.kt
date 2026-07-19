@@ -56,12 +56,13 @@ class AlarmService : Service() {
         val reminderLabel = intent?.getStringExtra("REMINDER_LABEL") ?: "Event Reminder"
         val eventTitle = intent?.getStringExtra("EVENT_TITLE") ?: "Calendar Event"
         val isWorkday = intent?.getBooleanExtra("IS_WORKDAY", false) ?: false
+        val isMeeting = intent?.getBooleanExtra("IS_MEETING", false) ?: false
         val action = intent?.action ?: ACTION_START
 
         val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
         val isWorkEnvironment = prefs.getBoolean("is_work_environment", false)
 
-        Log.d(TAG, "onStartCommand: action=$action, eventId=$eventId, title=$eventTitle, isWorkday=$isWorkday, isWorkEnvironment=$isWorkEnvironment")
+        Log.d(TAG, "onStartCommand: action=$action, eventId=$eventId, title=$eventTitle, isWorkday=$isWorkday, isMeeting=$isMeeting, isWorkEnvironment=$isWorkEnvironment")
 
         if (eventId == -1) {
             stopSelf()
@@ -114,7 +115,7 @@ class AlarmService : Service() {
                         }
                     } else {
                         // Standard work alarms
-                        val notification = buildWorkAlarmNotification(eventId, eventTitle, reminderLabel, false)
+                        val notification = buildWorkAlarmNotification(eventId, eventTitle, reminderLabel, false, isMeeting)
                         startForeground(NOTIFICATION_ID, notification)
                     }
                 } else {
@@ -130,10 +131,10 @@ class AlarmService : Service() {
 
                 if (isWorkEnvironment) {
                     if (reminderLabel == "1 Minute Before") {
-                        val notification = buildWorkAlarmNotification(eventId, eventTitle, reminderLabel, silenced = true)
+                        val notification = buildWorkAlarmNotification(eventId, eventTitle, reminderLabel, silenced = true, isMeeting = isMeeting)
                         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                         notificationManager.notify(NOTIFICATION_ID, notification)
-                        Log.d(TAG, "Work Alarm silenced. Sticky meeting notification remains.")
+                        Log.d(TAG, "Work Alarm silenced. Sticky notification remains.")
                     } else {
                         Log.d(TAG, "Non-sticky work alarm silenced. Stopping service.")
                         stopSelf()
@@ -546,7 +547,8 @@ class AlarmService : Service() {
         eventId: Int,
         eventTitle: String,
         reminderLabel: String,
-        silenced: Boolean
+        silenced: Boolean,
+        isMeeting: Boolean
     ): Notification {
         val appIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -572,6 +574,7 @@ class AlarmService : Service() {
             putExtra("EVENT_ID", eventId)
             putExtra("REMINDER_LABEL", reminderLabel)
             putExtra("EVENT_TITLE", eventTitle)
+            putExtra("IS_MEETING", isMeeting)
         }
         val deletePendingIntent = PendingIntent.getService(
             this,
@@ -586,17 +589,22 @@ class AlarmService : Service() {
                 .setAutoCancel(false)
 
             if (silenced) {
-                val title = "🤝 Join Meeting: $eventTitle"
-                val body = "🛡️ WORK ENVIRONMENT ACTIVE\n\nMeeting: $eventTitle\nStatus: Alarm silenced, but notification remains active.\n\n⚠️ Action Required:\nYou must join or mark this meeting as joined to dismiss this notification."
+                val title = if (isMeeting) "🤝 Join Meeting: $eventTitle" else "💼 Work Event: $eventTitle"
+                val body = if (isMeeting) {
+                    "🛡️ WORK ENVIRONMENT ACTIVE\n\nMeeting: $eventTitle\nStatus: Alarm silenced, but notification remains active.\n\n⚠️ Action Required:\nYou must join or mark this meeting as joined to dismiss this notification."
+                } else {
+                    "🛡️ WORK ENVIRONMENT ACTIVE\n\nEvent: $eventTitle\nStatus: Alarm silenced, but notification remains active.\n\n⚠️ Action Required:\nYou must complete or mark this event as completed to dismiss this notification."
+                }
                 
                 builder.setContentTitle(title)
-                    .setContentText("Meeting is starting immediately. Mark joined to dismiss.")
+                    .setContentText(if (isMeeting) "Meeting is starting immediately. Mark joined to dismiss." else "Event has started. Mark completed to dismiss.")
                     .setStyle(NotificationCompat.BigTextStyle().bigText(body))
 
-                // Action to Join Meeting
+                // Action to Join/Complete Meeting/Event
                 val joinIntent = Intent(this, AlarmService::class.java).apply {
                     action = ACTION_JOIN_MEETING
                     putExtra("EVENT_ID", eventId)
+                    putExtra("IS_MEETING", isMeeting)
                 }
                 val joinPendingIntent = PendingIntent.getService(
                     this,
@@ -605,16 +613,20 @@ class AlarmService : Service() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
                 builder.addAction(
-                    android.R.drawable.ic_menu_call,
-                    "Join Meeting",
+                    if (isMeeting) android.R.drawable.ic_menu_call else android.R.drawable.ic_menu_add,
+                    if (isMeeting) "Join Meeting" else "Mark Completed",
                     joinPendingIntent
                 )
             } else {
-                val title = "🚨 Meeting Starting: $eventTitle"
-                val body = "⏰ Reminder: 1 Minute Before\n\n💼 WORK ENVIRONMENT ACTIVE\nThe meeting starts in 1 minute. Please join now!\n\n⚠️ This is a sticky alarm. You must mark as Joined to dismiss."
+                val title = if (isMeeting) "🚨 Meeting Starting: $eventTitle" else "💼 Work Event Starting: $eventTitle"
+                val body = if (isMeeting) {
+                    "⏰ Reminder: 1 Minute Before\n\n💼 WORK ENVIRONMENT ACTIVE\nThe meeting starts in 1 minute. Please join now!\n\n⚠️ This is a sticky alarm. You must mark as Joined to dismiss."
+                } else {
+                    "⏰ Reminder: 1 Minute Before\n\n💼 WORK ENVIRONMENT ACTIVE\nThe event starts in 1 minute. Please prepare now!\n\n⚠️ This is a sticky alarm. You must mark as Completed to dismiss."
+                }
 
                 builder.setContentTitle(title)
-                    .setContentText("Meeting starting in 1 minute. Join now!")
+                    .setContentText(if (isMeeting) "Meeting starting in 1 minute. Join now!" else "Event starting in 1 minute. Prepare now!")
                     .setStyle(NotificationCompat.BigTextStyle().bigText(body))
 
                 // Silence button
@@ -623,6 +635,7 @@ class AlarmService : Service() {
                     putExtra("EVENT_ID", eventId)
                     putExtra("REMINDER_LABEL", reminderLabel)
                     putExtra("EVENT_TITLE", eventTitle)
+                    putExtra("IS_MEETING", isMeeting)
                 }
                 val silencePendingIntent = PendingIntent.getService(
                     this,
@@ -636,10 +649,11 @@ class AlarmService : Service() {
                     silencePendingIntent
                 )
 
-                // Join Meeting button
+                // Join/Complete button
                 val joinIntent = Intent(this, AlarmService::class.java).apply {
                     action = ACTION_JOIN_MEETING
                     putExtra("EVENT_ID", eventId)
+                    putExtra("IS_MEETING", isMeeting)
                 }
                 val joinPendingIntent = PendingIntent.getService(
                     this,
@@ -648,8 +662,8 @@ class AlarmService : Service() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
                 builder.addAction(
-                    android.R.drawable.ic_menu_call,
-                    "Join Meeting",
+                    if (isMeeting) android.R.drawable.ic_menu_call else android.R.drawable.ic_menu_add,
+                    if (isMeeting) "Join Meeting" else "Mark Completed",
                     joinPendingIntent
                 )
 
@@ -659,6 +673,7 @@ class AlarmService : Service() {
                     putExtra("EVENT_ID", eventId)
                     putExtra("REMINDER_LABEL", reminderLabel)
                     putExtra("EVENT_TITLE", eventTitle)
+                    putExtra("IS_MEETING", isMeeting)
                 }
                 val snoozePendingIntent = PendingIntent.getService(
                     this,
@@ -677,11 +692,15 @@ class AlarmService : Service() {
             builder.setOngoing(false)
                 .setAutoCancel(true)
 
-            val title = "⏱️ Meeting in 5 Mins: $eventTitle"
-            val body = "⏰ Reminder: 5 Minutes Before\n\n💼 WORK ENVIRONMENT ACTIVE\nYour meeting starts soon. Tap to view or prepare."
+            val title = if (isMeeting) "⏱️ Meeting in 5 Mins: $eventTitle" else "⏱️ Work Event in 5 Mins: $eventTitle"
+            val body = if (isMeeting) {
+                "⏰ Reminder: 5 Minutes Before\n\n💼 WORK ENVIRONMENT ACTIVE\nYour meeting starts soon. Tap to view or prepare."
+            } else {
+                "⏰ Reminder: 5 Minutes Before\n\n💼 WORK ENVIRONMENT ACTIVE\nYour work event starts soon. Tap to view or prepare."
+            }
 
             builder.setContentTitle(title)
-                .setContentText("Meeting starting in 5 minutes.")
+                .setContentText(if (isMeeting) "Meeting starting in 5 minutes." else "Event starting in 5 minutes.")
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
 
             // Snooze button
@@ -690,6 +709,7 @@ class AlarmService : Service() {
                 putExtra("EVENT_ID", eventId)
                 putExtra("REMINDER_LABEL", reminderLabel)
                 putExtra("EVENT_TITLE", eventTitle)
+                putExtra("IS_MEETING", isMeeting)
             }
             val snoozePendingIntent = PendingIntent.getService(
                 this,
@@ -707,6 +727,7 @@ class AlarmService : Service() {
             val dismissIntent = Intent(this, AlarmService::class.java).apply {
                 action = ACTION_DISMISS
                 putExtra("EVENT_ID", eventId)
+                putExtra("IS_MEETING", isMeeting)
             }
             val dismissPendingIntent = PendingIntent.getService(
                 this,

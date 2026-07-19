@@ -37,6 +37,27 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
     )
     val isWorkEnvironment: StateFlow<Boolean> = isWorkEnvironmentState
 
+    val userEmailState = kotlinx.coroutines.flow.MutableStateFlow(
+        sharedPrefs.getString("user_email", "elibrown62@gmail.com") ?: "elibrown62@gmail.com"
+    )
+    val userEmail: StateFlow<String> = userEmailState
+
+    val userNameState = kotlinx.coroutines.flow.MutableStateFlow(
+        sharedPrefs.getString("user_name", "Elzareez Brown") ?: "Elzareez Brown"
+    )
+    val userName: StateFlow<String> = userNameState
+
+    fun saveUserIdentity(email: String, name: String) {
+        viewModelScope.launch {
+            sharedPrefs.edit()
+                .putString("user_email", email.trim())
+                .putString("user_name", name.trim())
+                .apply()
+            userEmailState.value = email.trim()
+            userNameState.value = name.trim()
+        }
+    }
+
     init {
         val database = AppDatabase.getDatabase(application)
         repository = EventRepository(database.eventDao())
@@ -176,7 +197,9 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                         CalendarContract.Events.TITLE,
                         CalendarContract.Events.DESCRIPTION,
                         CalendarContract.Events.DTSTART,
-                        CalendarContract.Events.CALENDAR_DISPLAY_NAME
+                        CalendarContract.Events.CALENDAR_DISPLAY_NAME,
+                        CalendarContract.Events.EVENT_LOCATION,
+                        CalendarContract.Events.ORGANIZER
                     )
                     
                     val now = System.currentTimeMillis()
@@ -201,6 +224,8 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                         val descCol = c.getColumnIndex(CalendarContract.Events.DESCRIPTION)
                         val dtStartCol = c.getColumnIndex(CalendarContract.Events.DTSTART)
                         val calNameCol = c.getColumnIndex(CalendarContract.Events.CALENDAR_DISPLAY_NAME)
+                        val locCol = c.getColumnIndex(CalendarContract.Events.EVENT_LOCATION)
+                        val orgCol = c.getColumnIndex(CalendarContract.Events.ORGANIZER)
                         
                         val currentEvents = repository.getAllEventsList()
                         
@@ -209,8 +234,44 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                             val desc = if (descCol >= 0) c.getString(descCol) ?: "" else ""
                             val dtStart = if (dtStartCol >= 0) c.getLong(dtStartCol) else 0L
                             val calName = if (calNameCol >= 0) c.getString(calNameCol) ?: "" else ""
+                            val location = if (locCol >= 0) c.getString(locCol) ?: "" else ""
+                            val organizer = if (orgCol >= 0) c.getString(orgCol) ?: "" else ""
                             
                             if (dtStart < now) continue // Skip passed events completely
+                            
+                            // Filtering out company-wide events that are not related to the user's email or specific calendar
+                            val calendarDisplayName = calName.trim()
+                            val currentUserEmail = userEmailState.value
+                            val currentUserName = userNameState.value
+                            val emailPrefix = currentUserEmail.substringBefore("@")
+                            val firstName = currentUserName.substringBefore(" ")
+
+                            val isPersonalCalendar = (currentUserName.isNotBlank() && calendarDisplayName.equals(currentUserName, ignoreCase = true)) ||
+                                    calendarDisplayName.contains("personal", ignoreCase = true) ||
+                                    calendarDisplayName.contains("private", ignoreCase = true) ||
+                                    calendarDisplayName.contains("my calendar", ignoreCase = true) ||
+                                    (currentUserEmail.isNotBlank() && calendarDisplayName.contains(currentUserEmail, ignoreCase = true)) ||
+                                    (emailPrefix.isNotBlank() && calendarDisplayName.contains(emailPrefix, ignoreCase = true)) ||
+                                    (firstName.isNotBlank() && calendarDisplayName.contains(firstName, ignoreCase = true)) ||
+                                    calendarDisplayName.equals("Birthdays", ignoreCase = true) ||
+                                    calendarDisplayName.equals("Tasks", ignoreCase = true)
+                            
+                            val isRelatedToUser = (currentUserEmail.isNotBlank() && (
+                                    organizer.contains(currentUserEmail, ignoreCase = true) ||
+                                    title.contains(currentUserEmail, ignoreCase = true) ||
+                                    desc.contains(currentUserEmail, ignoreCase = true) ||
+                                    location.contains(currentUserEmail, ignoreCase = true)
+                                )) || (firstName.isNotBlank() && (
+                                    title.contains(firstName, ignoreCase = true) ||
+                                    desc.contains(firstName, ignoreCase = true) ||
+                                    location.contains(firstName, ignoreCase = true)
+                                ))
+                            
+                            // If it's not a personal calendar AND not specifically related to their email/identity, skip importing
+                            if (!isPersonalCalendar && !isRelatedToUser) {
+                                Log.d("EventViewModel", "Skipping unrelated company event: Title=$title, Calendar=$calName")
+                                continue
+                            }
                             
                             // Check if it already exists by title and dateTimeMillis
                             val alreadyExists = currentEvents.any { 
@@ -223,9 +284,23 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                                 val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
                                 val isWorkdayDay = dayOfWeek != Calendar.FRIDAY && dayOfWeek != Calendar.SATURDAY
                                 
+                                // Format the description to preserve Google Meet links and indicate the calendar source
+                                var finalDesc = desc
+                                if (location.isNotBlank() && !finalDesc.contains(location, ignoreCase = true)) {
+                                    finalDesc = if (finalDesc.isBlank()) location else "$finalDesc\n\nLocation: $location"
+                                }
+                                if (location.contains("meet.google.com", ignoreCase = true) && !finalDesc.contains("meet.google.com", ignoreCase = true)) {
+                                    finalDesc = "$finalDesc\n\nGoogle Meet: $location"
+                                }
+                                finalDesc = if (finalDesc.isNotBlank()) {
+                                    "$finalDesc\n\n[Calendar: $calName]"
+                                } else {
+                                    "Synced from calendar: $calName"
+                                }
+                                
                                 val newEvent = Event(
                                     title = title,
-                                    description = desc.ifBlank { "Synced from calendar: $calName" },
+                                    description = finalDesc,
                                     dateTimeMillis = dtStart,
                                     isWorkday = isWorkdayDay,
                                     isEmailSent = false

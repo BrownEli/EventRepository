@@ -17,6 +17,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -138,11 +139,60 @@ fun MainScreen(
     val now = System.currentTimeMillis()
     
     val isWorkEnvironment by viewModel.isWorkEnvironment.collectAsStateWithLifecycle()
+    val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
+    val userName by viewModel.userName.collectAsStateWithLifecycle()
 
-    val filteredEvents = remember(events, isWorkEnvironment) {
+    val filteredEvents = remember(events, isWorkEnvironment, userEmail, userName) {
         val nowTime = System.currentTimeMillis()
         val limit = if (isWorkEnvironment) 7L * 24 * 60 * 60 * 1000 else 3L * 7 * 24 * 60 * 60 * 1000
-        events.filter { it.dateTimeMillis >= nowTime && it.dateTimeMillis <= nowTime + limit }
+        val timeFiltered = events.filter { it.dateTimeMillis >= nowTime && it.dateTimeMillis <= nowTime + limit }
+        
+        if (isWorkEnvironment) {
+            val emailPrefix = userEmail.substringBefore("@")
+            val firstName = userName.substringBefore(" ")
+            
+            timeFiltered.filter { event ->
+                val desc = event.description
+                val title = event.title
+                
+                // If it is manually created (i.e. not synced from GCal), keep it
+                val isSynced = desc.contains("Synced from calendar:", ignoreCase = true) || desc.contains("[Calendar:", ignoreCase = true)
+                if (!isSynced) {
+                    true
+                } else {
+                    // Extract calendar name
+                    val calName = if (desc.contains("[Calendar:", ignoreCase = true)) {
+                        desc.substringAfter("[Calendar:").substringBefore("]").trim()
+                    } else if (desc.contains("Synced from calendar:", ignoreCase = true)) {
+                        desc.substringAfter("Synced from calendar:").trim()
+                    } else {
+                        ""
+                    }
+                    
+                    val isPersonalCal = (userName.isNotBlank() && calName.equals(userName, ignoreCase = true)) ||
+                            calName.contains("personal", ignoreCase = true) ||
+                            calName.contains("private", ignoreCase = true) ||
+                            calName.contains("my calendar", ignoreCase = true) ||
+                            (userEmail.isNotBlank() && calName.contains(userEmail, ignoreCase = true)) ||
+                            (emailPrefix.isNotBlank() && calName.contains(emailPrefix, ignoreCase = true)) ||
+                            (firstName.isNotBlank() && calName.contains(firstName, ignoreCase = true)) ||
+                            calName.equals("Birthdays", ignoreCase = true) ||
+                            calName.equals("Tasks", ignoreCase = true)
+                            
+                    val isRelatedToEmail = (userEmail.isNotBlank() && (
+                                title.contains(userEmail, ignoreCase = true) ||
+                                desc.contains(userEmail, ignoreCase = true)
+                            )) || (firstName.isNotBlank() && (
+                                title.contains(firstName, ignoreCase = true) ||
+                                desc.contains(firstName, ignoreCase = true)
+                            ))
+                            
+                    isPersonalCal || isRelatedToEmail
+                }
+            }
+        } else {
+            timeFiltered
+        }
     }
 
     Column(
@@ -430,6 +480,154 @@ fun MainScreen(
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.labelLarge
                                     )
+                                }
+                            }
+                        }
+
+                        item {
+                            var isEditingIdentity by remember { mutableStateOf(false) }
+                            val currentUserEmail by viewModel.userEmail.collectAsStateWithLifecycle()
+                            val currentUserName by viewModel.userName.collectAsStateWithLifecycle()
+                            
+                            var emailInput by remember(currentUserEmail) { mutableStateOf(currentUserEmail) }
+                            var nameInput by remember(currentUserName) { mutableStateOf(currentUserName) }
+                            
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                ),
+                                border = BorderStroke(1.dp, polishColors.border.copy(alpha = 0.2f))
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { isEditingIdentity = !isEditingIdentity },
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .background(
+                                                        polishColors.primary.copy(alpha = 0.15f),
+                                                        RoundedCornerShape(18.dp)
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Person,
+                                                    contentDescription = null,
+                                                    tint = polishColors.primary,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Sync Identity Profile",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = polishColors.primary
+                                                )
+                                                Text(
+                                                    text = if (currentUserEmail.isNotBlank()) "$currentUserName ($currentUserEmail)" else "Not Configured",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = polishColors.onSurfaceVariant.copy(alpha = 0.8f)
+                                                )
+                                            }
+                                        }
+                                        Icon(
+                                            imageVector = if (isEditingIdentity) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                            contentDescription = "Toggle Identity Settings",
+                                            tint = polishColors.onSurfaceVariant
+                                        )
+                                    }
+                                    
+                                    AnimatedVisibility(
+                                        visible = isEditingIdentity,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            HorizontalDivider(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                color = polishColors.border.copy(alpha = 0.2f)
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            
+                                            // Email Field
+                                            OutlinedTextField(
+                                                value = emailInput,
+                                                onValueChange = { emailInput = it },
+                                                label = { Text("User Email") },
+                                                placeholder = { Text("e.g. elibrown62@gmail.com") },
+                                                modifier = Modifier.fillMaxWidth().testTag("identity_email_input"),
+                                                singleLine = true,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            
+                                            // Name Field
+                                            OutlinedTextField(
+                                                value = nameInput,
+                                                onValueChange = { nameInput = it },
+                                                label = { Text("Display Name") },
+                                                placeholder = { Text("e.g. Elzareez Brown") },
+                                                modifier = Modifier.fillMaxWidth().testTag("identity_name_input"),
+                                                singleLine = true,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.End
+                                            ) {
+                                                TextButton(
+                                                    onClick = {
+                                                        emailInput = currentUserEmail
+                                                        nameInput = currentUserName
+                                                        isEditingIdentity = false
+                                                    }
+                                                ) {
+                                                    Text("Cancel")
+                                                }
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Button(
+                                                    onClick = {
+                                                        viewModel.saveUserIdentity(emailInput, nameInput)
+                                                        isEditingIdentity = false
+                                                        Toast.makeText(context, "Identity updated!", Toast.LENGTH_SHORT).show()
+                                                    },
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = polishColors.primary,
+                                                        contentColor = Color.White
+                                                    )
+                                                ) {
+                                                    Text("Save Profile")
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1115,17 +1313,38 @@ fun EventItemCard(
             // Workday or Work Environment checklist controls
             val showChecklist = isWorkEnvironment || event.isWorkday
             if (showChecklist) {
-                val actionLabel = if (isWorkEnvironment) "Joined Meeting" else "Work Email Sent"
-                val statusLabel = if (isWorkEnvironment) "MEETING JOINED" else "EMAIL SENT"
-                val defaultStatusLabel = if (isWorkEnvironment) "STICKY PROMPT" else "STICKY PROMPT"
-                val defaultActionLabel = if (isWorkEnvironment) "Mark as Joined" else "Confirm Work Email Sent"
+                val isMeeting = event.isMeeting
+                val actionLabel = if (isWorkEnvironment) {
+                    if (isMeeting) "Joined Meeting" else "Work Event Completed"
+                } else {
+                    "Work Email Sent"
+                }
+                val statusLabel = if (isWorkEnvironment) {
+                    if (isMeeting) "MEETING JOINED" else "EVENT COMPLETED"
+                } else {
+                    "EMAIL SENT"
+                }
+                val defaultStatusLabel = "STICKY PROMPT"
+                val defaultActionLabel = if (isWorkEnvironment) {
+                    if (isMeeting) "Mark as Joined" else "Confirm Event Completed"
+                } else {
+                    "Confirm Work Email Sent"
+                }
                 val actionBtnLabel = if (isWorkEnvironment) {
-                    if (event.isEmailSent) "Reset" else "Join"
+                    if (isMeeting) {
+                        if (event.isEmailSent) "Reset" else "Join"
+                    } else {
+                        if (event.isEmailSent) "Reset" else "Complete"
+                    }
                 } else {
                     if (event.isEmailSent) "Reset" else "Mark Sent"
                 }
                 val icon = if (isWorkEnvironment) {
-                    if (event.isEmailSent) Icons.Default.CheckCircle else Icons.Default.Call
+                    if (isMeeting) {
+                        if (event.isEmailSent) Icons.Default.CheckCircle else Icons.Default.Call
+                    } else {
+                        if (event.isEmailSent) Icons.Default.CheckCircle else Icons.Default.Check
+                    }
                 } else {
                     if (event.isEmailSent) Icons.Default.MailOutline else Icons.Default.Mail
                 }

@@ -13,8 +13,9 @@ class AlarmReceiver : BroadcastReceiver() {
         val reminderLabel = intent.getStringExtra("REMINDER_LABEL") ?: "Event Reminder"
         val eventTitle = intent.getStringExtra("EVENT_TITLE") ?: "Event"
         val isWorkday = intent.getBooleanExtra("IS_WORKDAY", false)
+        val isMeeting = intent.getBooleanExtra("IS_MEETING", false)
 
-        Log.d("AlarmReceiver", "Alarm received for event: $eventId, Title: $eventTitle, Label: $reminderLabel, isWorkday: $isWorkday")
+        Log.d("AlarmReceiver", "Alarm received for event: $eventId, Title: $eventTitle, Label: $reminderLabel, isWorkday: $isWorkday, isMeeting: $isMeeting")
 
         if (eventId != -1) {
             val serviceIntent = Intent(context, AlarmService::class.java).apply {
@@ -22,6 +23,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 putExtra("REMINDER_LABEL", reminderLabel)
                 putExtra("EVENT_TITLE", eventTitle)
                 putExtra("IS_WORKDAY", isWorkday)
+                putExtra("IS_MEETING", isMeeting)
             }
             try {
                 ContextCompat.startForegroundService(context, serviceIntent)

@@ -81,7 +81,8 @@ class AlarmScheduler(private val context: Context) {
                     eventId = event.id,
                     reminderLabel = label,
                     eventTitle = event.title,
-                    isWorkday = event.isWorkday
+                    isWorkday = event.isWorkday,
+                    isMeeting = event.isMeeting
                 )
             } else {
                 Log.d(TAG, "Skipping past reminder '$label' for event ${event.id} (Scheduled trigger: $triggerTime, current: $currentTime)")
@@ -95,13 +96,15 @@ class AlarmScheduler(private val context: Context) {
         eventId: Int,
         reminderLabel: String,
         eventTitle: String,
-        isWorkday: Boolean
+        isWorkday: Boolean,
+        isMeeting: Boolean
     ) {
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             putExtra("EVENT_ID", eventId)
             putExtra("REMINDER_LABEL", reminderLabel)
             putExtra("EVENT_TITLE", eventTitle)
             putExtra("IS_WORKDAY", isWorkday)
+            putExtra("IS_MEETING", isMeeting)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(

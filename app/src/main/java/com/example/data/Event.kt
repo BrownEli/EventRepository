@@ -12,6 +12,9 @@ data class Event(
     val isWorkday: Boolean, // True if during a workday or breaks a workday
     val isEmailSent: Boolean = false // Track whether user marked email as sent
 ) {
+    val isMeeting: Boolean
+        get() = description.contains("meet.google.com", ignoreCase = true) || title.contains("Google Meet", ignoreCase = true)
+
     // Utility to get next scheduled reminder
     fun getNextReminderText(currentTime: Long): String {
         val reminders = getReminderTimes()
