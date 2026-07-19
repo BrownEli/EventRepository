@@ -61,13 +61,9 @@ class MainActivity : ComponentActivity() {
         com.example.receiver.EventWidgetProvider.triggerUpdate(this)
         setContent {
             MyApplicationTheme {
-                Scaffold(
+                MainScreen(
                     modifier = Modifier.fillMaxSize()
-                ) { innerPadding ->
-                    MainScreen(
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                )
             }
         }
     }
@@ -209,12 +205,12 @@ fun MainScreen(
                     icon = {
                         Icon(
                             imageVector = Icons.Default.AddCircleOutline,
-                            contentDescription = "Enter Event"
+                            contentDescription = "Add Event"
                         )
                     },
                     label = {
                         Text(
-                            text = "Enter Event",
+                            text = "Add Event",
                             fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal
                         )
                     },
@@ -233,12 +229,12 @@ fun MainScreen(
                     icon = {
                         Icon(
                             imageVector = Icons.Default.Event,
-                            contentDescription = "Upcoming Events"
+                            contentDescription = "Upcoming"
                         )
                     },
                     label = {
                         Text(
-                            text = "Upcoming Events",
+                            text = "Upcoming",
                             fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal
                         )
                     },
@@ -283,6 +279,7 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .statusBarsPadding()
         ) {
             when (selectedTab) {
                 0 -> {

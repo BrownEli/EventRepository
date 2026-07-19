@@ -38,12 +38,12 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
     val isWorkEnvironment: StateFlow<Boolean> = isWorkEnvironmentState
 
     val userEmailState = kotlinx.coroutines.flow.MutableStateFlow(
-        sharedPrefs.getString("user_email", "elibrown62@gmail.com") ?: "elibrown62@gmail.com"
+        sharedPrefs.getString("user_email", "") ?: ""
     )
     val userEmail: StateFlow<String> = userEmailState
 
     val userNameState = kotlinx.coroutines.flow.MutableStateFlow(
-        sharedPrefs.getString("user_name", "Elzareez Brown") ?: "Elzareez Brown"
+        sharedPrefs.getString("user_name", "") ?: ""
     )
     val userName: StateFlow<String> = userNameState
 
@@ -79,6 +79,20 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        // Reset old hardcoded defaults
+        var savedEmail = sharedPrefs.getString("user_email", "") ?: ""
+        var savedName = sharedPrefs.getString("user_name", "") ?: ""
+        if (savedEmail == "elibrown62@gmail.com") {
+            sharedPrefs.edit().remove("user_email").apply()
+            savedEmail = ""
+        }
+        if (savedName == "Elzareez Brown") {
+            sharedPrefs.edit().remove("user_name").apply()
+            savedName = ""
+        }
+        userEmailState.value = savedEmail
+        userNameState.value = savedName
+
         val database = AppDatabase.getDatabase(application)
         repository = EventRepository(database.eventDao())
         alarmScheduler = AlarmScheduler(application)
@@ -206,6 +220,9 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                     onComplete(-1) // Permission not granted
                     return@launch
                 }
+
+                // Attempts to load user's calendar email as default if currently blank
+                tryLoadDefaultEmailFromCalendar(context)
 
                 val addedCount = withContext(Dispatchers.IO) {
                     var count = 0
@@ -344,6 +361,48 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 Log.e("EventViewModel", "Failed to sync calendar: ${e.message}", e)
                 onComplete(-2)
+            }
+        }
+    }
+
+    /**
+     * Attempts to read the first Google Calendar account/owner email address on the device
+     * and sets it as the default email if the user's stored email is blank.
+     */
+    fun tryLoadDefaultEmailFromCalendar(context: Context) {
+        viewModelScope.launch {
+            if (userEmailState.value.isBlank()) {
+                val email = withContext(Dispatchers.IO) {
+                    try {
+                        if (ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.READ_CALENDAR
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            val uri = CalendarContract.Calendars.CONTENT_URI
+                            val projection = arrayOf(
+                                CalendarContract.Calendars.ACCOUNT_NAME,
+                                CalendarContract.Calendars.OWNER_ACCOUNT,
+                                CalendarContract.Calendars.IS_PRIMARY
+                            )
+                            val sortOrder = "${CalendarContract.Calendars.IS_PRIMARY} DESC"
+                            context.contentResolver.query(uri, projection, null, null, sortOrder)?.use { cursor ->
+                                while (cursor.moveToNext()) {
+                                    val accountName = cursor.getString(0) ?: ""
+                                    val ownerAccount = cursor.getString(1) ?: ""
+                                    if (accountName.contains("@")) return@withContext accountName
+                                    if (ownerAccount.contains("@")) return@withContext ownerAccount
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("EventViewModel", "Error fetching calendar email: ${e.message}")
+                    }
+                    null
+                }
+                if (!email.isNullOrBlank()) {
+                    saveUserIdentity(email, userNameState.value)
+                }
             }
         }
     }
