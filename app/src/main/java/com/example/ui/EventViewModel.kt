@@ -47,6 +47,26 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
     )
     val userName: StateFlow<String> = userNameState
 
+    val isGcalSyncEnabledState = kotlinx.coroutines.flow.MutableStateFlow(
+        sharedPrefs.getBoolean("gcal_sync_enabled", false)
+    )
+    val isGcalSyncEnabled: StateFlow<Boolean> = isGcalSyncEnabledState
+
+    fun toggleGcalSync(context: Context, onComplete: (Int) -> Unit = {}) {
+        viewModelScope.launch {
+            val newValue = !isGcalSyncEnabledState.value
+            sharedPrefs.edit().putBoolean("gcal_sync_enabled", newValue).apply()
+            isGcalSyncEnabledState.value = newValue
+            if (newValue) {
+                syncGoogleCalendar(context) { count ->
+                    onComplete(count)
+                }
+            } else {
+                onComplete(0)
+            }
+        }
+    }
+
     fun saveUserIdentity(email: String, name: String) {
         viewModelScope.launch {
             sharedPrefs.edit()

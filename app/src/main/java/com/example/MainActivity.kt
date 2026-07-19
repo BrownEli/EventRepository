@@ -135,7 +135,7 @@ fun MainScreen(
     }
 
     val polishColors = LocalPolishColors.current
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableStateOf(1) }
     val now = System.currentTimeMillis()
     
     val isWorkEnvironment by viewModel.isWorkEnvironment.collectAsStateWithLifecycle()
@@ -195,517 +195,98 @@ fun MainScreen(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(polishColors.background)
-    ) {
-        // Tab Row at the top with elegant Material 3 styling
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = polishColors.surface,
-            contentColor = polishColors.primary,
-            indicator = { tabPositions ->
-                TabRowDefaults.SecondaryIndicator(
-                    Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                    color = polishColors.primary
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        bottomBar = {
+            NavigationBar(
+                containerColor = polishColors.surface,
+                contentColor = polishColors.primary,
+                tonalElevation = 8.dp
+            ) {
+                NavigationBarItem(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.AddCircleOutline,
+                            contentDescription = "Enter Event"
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "Enter Event",
+                            fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = polishColors.primary,
+                        selectedTextColor = polishColors.primary,
+                        unselectedIconColor = polishColors.onSurfaceVariant.copy(alpha = 0.7f),
+                        unselectedTextColor = polishColors.onSurfaceVariant.copy(alpha = 0.7f),
+                        indicatorColor = polishColors.primary.copy(alpha = 0.15f)
+                    ),
+                    modifier = Modifier.testTag("nav_enter_event")
                 )
-            },
-            divider = {
-                HorizontalDivider(color = polishColors.border.copy(alpha = 0.5f))
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Tab(
-                selected = selectedTab == 0,
-                onClick = { selectedTab = 0 },
-                text = {
-                    Text(
-                        text = "Upcoming Events",
-                        fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                },
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.Event,
-                        contentDescription = "Upcoming Events",
-                        tint = if (selectedTab == 0) polishColors.primary else polishColors.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                },
-                modifier = Modifier.testTag("tab_upcoming_events")
-            )
-            Tab(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
-                text = {
-                    Text(
-                        text = "Enter Event",
-                        fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                },
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.AddCircleOutline,
-                        contentDescription = "Enter Event",
-                        tint = if (selectedTab == 1) polishColors.primary else polishColors.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                },
-                modifier = Modifier.testTag("tab_enter_event")
-            )
-        }
-
-        // Tab Content view container
+                NavigationBarItem(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Event,
+                            contentDescription = "Upcoming Events"
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "Upcoming Events",
+                            fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = polishColors.primary,
+                        selectedTextColor = polishColors.primary,
+                        unselectedIconColor = polishColors.onSurfaceVariant.copy(alpha = 0.7f),
+                        unselectedTextColor = polishColors.onSurfaceVariant.copy(alpha = 0.7f),
+                        indicatorColor = polishColors.primary.copy(alpha = 0.15f)
+                    ),
+                    modifier = Modifier.testTag("nav_upcoming_events")
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings"
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "Settings",
+                            fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = polishColors.primary,
+                        selectedTextColor = polishColors.primary,
+                        unselectedIconColor = polishColors.onSurfaceVariant.copy(alpha = 0.7f),
+                        unselectedTextColor = polishColors.onSurfaceVariant.copy(alpha = 0.7f),
+                        indicatorColor = polishColors.primary.copy(alpha = 0.15f)
+                    ),
+                    modifier = Modifier.testTag("nav_settings")
+                )
+            }
+        },
+        containerColor = polishColors.background
+    ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .weight(1f)
+                .padding(paddingValues)
         ) {
             when (selectedTab) {
                 0 -> {
-                    // TAB 0: Upcoming Events (next 3 weeks)
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Cosmic Banner
-                        item {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(150.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                            ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.img_alarm_header),
-                                    contentDescription = "Cosmic Alarm Clock Banner",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(
-                                            androidx.compose.ui.graphics.Brush.verticalGradient(
-                                                colors = listOf(
-                                                    androidx.compose.ui.graphics.Color.Transparent,
-                                                    androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)
-                                                )
-                                            )
-                                        )
-                                )
-                                Column(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomStart)
-                                        .padding(16.dp)
-                                ) {
-                                    Text(
-                                        text = "Calendar Event Alarms",
-                                        style = MaterialTheme.typography.titleLarge.copy(
-                                            color = androidx.compose.ui.graphics.Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 22.sp
-                                        )
-                                    )
-                                    Text(
-                                        text = "Ring-based alarms for appointments and deadlines",
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
-                                            fontSize = 12.sp
-                                        )
-                                    )
-                                }
-                            }
-                        }
-
-                        // Section header with Sync Controls & Active Badge
-                        item {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 0.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "Scheduled Alarms List",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = polishColors.primary
-                                        )
-                                        Text(
-                                            text = if (isWorkEnvironment) {
-                                                "Work Environment: Alarms scheduled for current week."
-                                            } else {
-                                                "Personal Environment: Alarms scheduled for next 2 weeks."
-                                            },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = polishColors.onSurfaceVariant.copy(alpha = 0.7f)
-                                        )
-                                    }
-                                    Badge(
-                                        containerColor = polishColors.primary.copy(alpha = 0.15f),
-                                        contentColor = polishColors.primary
-                                    ) {
-                                        Text(
-                                            text = "${filteredEvents.size} Events",
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                            fontWeight = FontWeight.Bold,
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                // Beautiful, high-contrast Work vs Personal Environment Switch Card
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (isWorkEnvironment) {
-                                            polishColors.primary.copy(alpha = 0.08f)
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                                        }
-                                    ),
-                                    border = BorderStroke(1.dp, polishColors.border.copy(alpha = 0.4f))
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(36.dp)
-                                                    .background(
-                                                        if (isWorkEnvironment) MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
-                                                        else polishColors.primary.copy(alpha = 0.15f),
-                                                        RoundedCornerShape(18.dp)
-                                                    ),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = if (isWorkEnvironment) Icons.Default.Work else Icons.Default.Home,
-                                                    contentDescription = null,
-                                                    tint = if (isWorkEnvironment) MaterialTheme.colorScheme.secondary else polishColors.primary,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Column {
-                                                Text(
-                                                    text = if (isWorkEnvironment) "💼 Work Mode Active" else "🏡 Personal Mode Active",
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (isWorkEnvironment) MaterialTheme.colorScheme.secondary else polishColors.primary
-                                                )
-                                                Text(
-                                                    text = if (isWorkEnvironment) {
-                                                        "Shows current week. Alarms: 8am list, 5-min, 1-min sticky."
-                                                    } else {
-                                                        "Shows next 3 weeks. Normal workday & personal alarm triggers."
-                                                    },
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = polishColors.onSurfaceVariant.copy(alpha = 0.8f)
-                                                )
-                                            }
-                                        }
-                                        Switch(
-                                            checked = isWorkEnvironment,
-                                            onCheckedChange = { viewModel.toggleWorkEnvironment() },
-                                            modifier = Modifier.testTag("environment_mode_switch"),
-                                            colors = SwitchDefaults.colors(
-                                                checkedThumbColor = MaterialTheme.colorScheme.secondary,
-                                                checkedTrackColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
-                                                uncheckedThumbColor = polishColors.primary,
-                                                uncheckedTrackColor = polishColors.primary.copy(alpha = 0.4f)
-                                            )
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                // Prominent, beautiful Sync button underneath the title headers
-                                Button(
-                                    onClick = {
-                                        viewModel.syncGoogleCalendar(context) { count ->
-                                            if (count > 0) {
-                                                Toast.makeText(context, "Successfully synced $count new calendar events!", Toast.LENGTH_LONG).show()
-                                            } else if (count == 0) {
-                                                Toast.makeText(context, "Calendar synced. No new events found.", Toast.LENGTH_SHORT).show()
-                                            } else if (count == -1) {
-                                                Toast.makeText(context, "Please grant Calendar permission to sync.", Toast.LENGTH_LONG).show()
-                                            } else {
-                                                Toast.makeText(context, "Calendar sync failed.", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .testTag("sync_calendar_prominent_button"),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = polishColors.primary,
-                                        contentColor = Color.White
-                                    ),
-                                    shape = RoundedCornerShape(12.dp),
-                                    contentPadding = PaddingValues(vertical = 10.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Sync,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Sync with Google Calendar",
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.labelLarge
-                                    )
-                                }
-                            }
-                        }
-
-                        item {
-                            var isEditingIdentity by remember { mutableStateOf(false) }
-                            val currentUserEmail by viewModel.userEmail.collectAsStateWithLifecycle()
-                            val currentUserName by viewModel.userName.collectAsStateWithLifecycle()
-                            
-                            var emailInput by remember(currentUserEmail) { mutableStateOf(currentUserEmail) }
-                            var nameInput by remember(currentUserName) { mutableStateOf(currentUserName) }
-                            
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
-                                ),
-                                border = BorderStroke(1.dp, polishColors.border.copy(alpha = 0.2f))
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { isEditingIdentity = !isEditingIdentity },
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(36.dp)
-                                                    .background(
-                                                        polishColors.primary.copy(alpha = 0.15f),
-                                                        RoundedCornerShape(18.dp)
-                                                    ),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Person,
-                                                    contentDescription = null,
-                                                    tint = polishColors.primary,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Column {
-                                                Text(
-                                                    text = "Sync Identity Profile",
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = polishColors.primary
-                                                )
-                                                Text(
-                                                    text = if (currentUserEmail.isNotBlank()) "$currentUserName ($currentUserEmail)" else "Not Configured",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = polishColors.onSurfaceVariant.copy(alpha = 0.8f)
-                                                )
-                                            }
-                                        }
-                                        Icon(
-                                            imageVector = if (isEditingIdentity) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                            contentDescription = "Toggle Identity Settings",
-                                            tint = polishColors.onSurfaceVariant
-                                        )
-                                    }
-                                    
-                                    AnimatedVisibility(
-                                        visible = isEditingIdentity,
-                                        enter = expandVertically() + fadeIn(),
-                                        exit = shrinkVertically() + fadeOut()
-                                    ) {
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = 12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            HorizontalDivider(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                color = polishColors.border.copy(alpha = 0.2f)
-                                            )
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            
-                                            // Email Field
-                                            OutlinedTextField(
-                                                value = emailInput,
-                                                onValueChange = { emailInput = it },
-                                                label = { Text("User Email") },
-                                                placeholder = { Text("e.g. elibrown62@gmail.com") },
-                                                modifier = Modifier.fillMaxWidth().testTag("identity_email_input"),
-                                                singleLine = true,
-                                                shape = RoundedCornerShape(8.dp)
-                                            )
-                                            
-                                            // Name Field
-                                            OutlinedTextField(
-                                                value = nameInput,
-                                                onValueChange = { nameInput = it },
-                                                label = { Text("Display Name") },
-                                                placeholder = { Text("e.g. Elzareez Brown") },
-                                                modifier = Modifier.fillMaxWidth().testTag("identity_name_input"),
-                                                singleLine = true,
-                                                shape = RoundedCornerShape(8.dp)
-                                            )
-                                            
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.End
-                                            ) {
-                                                TextButton(
-                                                    onClick = {
-                                                        emailInput = currentUserEmail
-                                                        nameInput = currentUserName
-                                                        isEditingIdentity = false
-                                                    }
-                                                ) {
-                                                    Text("Cancel")
-                                                }
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Button(
-                                                    onClick = {
-                                                        viewModel.saveUserIdentity(emailInput, nameInput)
-                                                        isEditingIdentity = false
-                                                        Toast.makeText(context, "Identity updated!", Toast.LENGTH_SHORT).show()
-                                                    },
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    colors = ButtonDefaults.buttonColors(
-                                                        containerColor = polishColors.primary,
-                                                        contentColor = Color.White
-                                                    )
-                                                ) {
-                                                    Text("Save Profile")
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Event Cards List
-                        if (filteredEvents.isEmpty()) {
-                            item {
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 8.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = polishColors.surface.copy(alpha = 0.5f)
-                                    ),
-                                    shape = RoundedCornerShape(20.dp),
-                                    border = BorderStroke(1.dp, polishColors.border.copy(alpha = 0.3f))
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(24.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.EventNote,
-                                            contentDescription = "No events icon",
-                                            tint = polishColors.onSurfaceVariant.copy(alpha = 0.5f),
-                                            modifier = Modifier.size(48.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(
-                                            text = "No Scheduled Alarms",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = FontWeight.Bold,
-                                            color = polishColors.text
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "Add an event in 'Enter Event' tab, or sync from your Google Calendar automatically.",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = polishColors.onSurfaceVariant,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            items(filteredEvents, key = { it.id }) { event ->
-                                EventItemCard(
-                                    event = event,
-                                    onDelete = { viewModel.deleteEvent(event) },
-                                    onToggleEmail = { viewModel.toggleEmailSent(event) },
-                                    onSyncCalendar = {
-                                        val calendarIntent = Intent(Intent.ACTION_INSERT).apply {
-                                            data = CalendarContract.Events.CONTENT_URI
-                                            putExtra(CalendarContract.Events.TITLE, event.title)
-                                            putExtra(CalendarContract.Events.DESCRIPTION, event.description)
-                                            putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.dateTimeMillis)
-                                            putExtra(CalendarContract.EXTRA_EVENT_END_TIME, event.dateTimeMillis + 60 * 60 * 1000)
-                                        }
-                                        try {
-                                            context.startActivity(calendarIntent)
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Google Calendar app not found.", Toast.LENGTH_SHORT).show()
-                                        }
-                                    },
-                                    isWorkEnvironment = isWorkEnvironment
-                                )
-                            }
-                        }
-
-                        item {
-                            Spacer(modifier = Modifier.height(32.dp))
-                        }
-                    }
-                }
-                1 -> {
-                    // TAB 1: Enter / Create Event & Instant Alarm Test Playground
+                    // TAB 0: Enter / Create Event & Instant Alarm Test Playground
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
@@ -895,6 +476,524 @@ fun MainScreen(
                                             Text("Stop")
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(32.dp))
+                        }
+                    }
+                }
+                1 -> {
+                    // TAB 1: Upcoming Events (next 3 weeks)
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Cosmic Banner
+                        item {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(150.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.img_alarm_header),
+                                    contentDescription = "Cosmic Alarm Clock Banner",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                colors = listOf(
+                                                    androidx.compose.ui.graphics.Color.Transparent,
+                                                    androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f)
+                                                )
+                                            )
+                                        )
+                                )
+                                Column(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(16.dp)
+                                ) {
+                                    Text(
+                                        text = "Calendar Event Alarms",
+                                        style = MaterialTheme.typography.titleLarge.copy(
+                                            color = androidx.compose.ui.graphics.Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 22.sp
+                                        )
+                                    )
+                                    Text(
+                                        text = "Ring-based alarms for appointments and deadlines",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
+                                            fontSize = 12.sp
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        // Section header with Active Badge
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 0.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Scheduled Alarms List",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = polishColors.primary
+                                        )
+                                        Text(
+                                            text = if (isWorkEnvironment) {
+                                                "Work Environment: Alarms scheduled for current week."
+                                            } else {
+                                                "Personal Environment: Alarms scheduled for next 3 weeks."
+                                            },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = polishColors.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                    Badge(
+                                        containerColor = polishColors.primary.copy(alpha = 0.15f),
+                                        contentColor = polishColors.primary
+                                    ) {
+                                        Text(
+                                            text = "${filteredEvents.size} Events",
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.labelMedium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Event Cards List
+                        if (filteredEvents.isEmpty()) {
+                            item {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = polishColors.surface.copy(alpha = 0.5f)
+                                    ),
+                                    shape = RoundedCornerShape(20.dp),
+                                    border = BorderStroke(1.dp, polishColors.border.copy(alpha = 0.3f))
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(24.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.EventNote,
+                                            contentDescription = "No events icon",
+                                            tint = polishColors.onSurfaceVariant.copy(alpha = 0.5f),
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "No Scheduled Alarms",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = polishColors.text
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Add an event in 'Enter Event' tab, or sync from your Google Calendar automatically.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = polishColors.onSurfaceVariant,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            items(filteredEvents, key = { it.id }) { event ->
+                                EventItemCard(
+                                    event = event,
+                                    onDelete = { viewModel.deleteEvent(event) },
+                                    onToggleEmail = { viewModel.toggleEmailSent(event) },
+                                    onSyncCalendar = {
+                                        val calendarIntent = Intent(Intent.ACTION_INSERT).apply {
+                                            data = CalendarContract.Events.CONTENT_URI
+                                            putExtra(CalendarContract.Events.TITLE, event.title)
+                                            putExtra(CalendarContract.Events.DESCRIPTION, event.description)
+                                            putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.dateTimeMillis)
+                                            putExtra(CalendarContract.EXTRA_EVENT_END_TIME, event.dateTimeMillis + 60 * 60 * 1000)
+                                        }
+                                        try {
+                                            context.startActivity(calendarIntent)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Google Calendar app not found.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    isWorkEnvironment = isWorkEnvironment
+                                )
+                            }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(32.dp))
+                        }
+                    }
+                }
+                2 -> {
+                    // TAB 2: Settings Screen
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Settings & Preferences",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = polishColors.primary,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+
+                        // 1. Sync Identity Profile as is
+                        item {
+                            var isEditingIdentity by remember { mutableStateOf(false) }
+                            val currentUserEmail by viewModel.userEmail.collectAsStateWithLifecycle()
+                            val currentUserName by viewModel.userName.collectAsStateWithLifecycle()
+                            
+                            var emailInput by remember(currentUserEmail) { mutableStateOf(currentUserEmail) }
+                            var nameInput by remember(currentUserName) { mutableStateOf(currentUserName) }
+                            
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                ),
+                                border = BorderStroke(1.dp, polishColors.border.copy(alpha = 0.2f))
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { isEditingIdentity = !isEditingIdentity },
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .background(
+                                                        polishColors.primary.copy(alpha = 0.15f),
+                                                        RoundedCornerShape(18.dp)
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Person,
+                                                    contentDescription = null,
+                                                    tint = polishColors.primary,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Sync Identity Profile",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = polishColors.primary
+                                                )
+                                                Text(
+                                                    text = if (currentUserEmail.isNotBlank()) "$currentUserName ($currentUserEmail)" else "Not Configured",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = polishColors.onSurfaceVariant.copy(alpha = 0.8f)
+                                                )
+                                            }
+                                        }
+                                        Icon(
+                                            imageVector = if (isEditingIdentity) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                            contentDescription = "Toggle Identity Settings",
+                                            tint = polishColors.onSurfaceVariant
+                                        )
+                                    }
+                                    
+                                    AnimatedVisibility(
+                                        visible = isEditingIdentity,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            HorizontalDivider(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                color = polishColors.border.copy(alpha = 0.2f)
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            
+                                            // Email Field
+                                            OutlinedTextField(
+                                                value = emailInput,
+                                                onValueChange = { emailInput = it },
+                                                label = { Text("User Email") },
+                                                placeholder = { Text("e.g. elibrown62@gmail.com") },
+                                                modifier = Modifier.fillMaxWidth().testTag("identity_email_input"),
+                                                singleLine = true,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            
+                                            // Name Field
+                                            OutlinedTextField(
+                                                value = nameInput,
+                                                onValueChange = { nameInput = it },
+                                                label = { Text("Display Name") },
+                                                placeholder = { Text("e.g. Elzareez Brown") },
+                                                modifier = Modifier.fillMaxWidth().testTag("identity_name_input"),
+                                                singleLine = true,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.End
+                                            ) {
+                                                TextButton(
+                                                    onClick = {
+                                                        emailInput = currentUserEmail
+                                                        nameInput = currentUserName
+                                                        isEditingIdentity = false
+                                                    }
+                                                ) {
+                                                    Text("Cancel")
+                                                }
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Button(
+                                                    onClick = {
+                                                        viewModel.saveUserIdentity(emailInput, nameInput)
+                                                        isEditingIdentity = false
+                                                        Toast.makeText(context, "Identity updated!", Toast.LENGTH_SHORT).show()
+                                                    },
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = polishColors.primary,
+                                                        contentColor = Color.White
+                                                    )
+                                                ) {
+                                                    Text("Save Profile")
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 2. Sync with Google Calendar as a toggle button
+                        item {
+                            var isSyncing by remember { mutableStateOf(false) }
+                            val isGcalSyncEnabled by viewModel.isGcalSyncEnabled.collectAsStateWithLifecycle()
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isGcalSyncEnabled) {
+                                        polishColors.primary.copy(alpha = 0.08f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                    }
+                                ),
+                                border = BorderStroke(1.dp, polishColors.border.copy(alpha = 0.2f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .background(
+                                                    if (isGcalSyncEnabled) polishColors.primary.copy(alpha = 0.15f)
+                                                    else polishColors.onSurfaceVariant.copy(alpha = 0.1f),
+                                                    RoundedCornerShape(18.dp)
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Sync,
+                                                contentDescription = null,
+                                                tint = if (isGcalSyncEnabled) polishColors.primary else polishColors.onSurfaceVariant,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                text = "Sync with Google Calendar",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isGcalSyncEnabled) polishColors.primary else polishColors.onSurfaceVariant
+                                            )
+                                            Text(
+                                                text = if (isSyncing) "Syncing..." else if (isGcalSyncEnabled) "Auto-sync enabled & connected" else "Tap to enable Google Calendar sync",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = polishColors.onSurfaceVariant.copy(alpha = 0.8f)
+                                            )
+                                        }
+                                    }
+                                    Switch(
+                                        checked = isGcalSyncEnabled,
+                                        onCheckedChange = { checked ->
+                                            isSyncing = true
+                                            viewModel.toggleGcalSync(context) { count ->
+                                                isSyncing = false
+                                                if (checked) {
+                                                    if (count > 0) {
+                                                        Toast.makeText(context, "Successfully synced $count new calendar events!", Toast.LENGTH_LONG).show()
+                                                    } else if (count == 0) {
+                                                        Toast.makeText(context, "Calendar synced. No new events found.", Toast.LENGTH_SHORT).show()
+                                                    } else if (count == -1) {
+                                                        Toast.makeText(context, "Please grant Calendar permission to sync.", Toast.LENGTH_LONG).show()
+                                                    } else {
+                                                        Toast.makeText(context, "Calendar sync failed.", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.testTag("gcal_sync_switch"),
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = polishColors.primary,
+                                            checkedTrackColor = polishColors.primary.copy(alpha = 0.4f)
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        // 3. Personal Mode Active as is
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isWorkEnvironment) {
+                                        polishColors.primary.copy(alpha = 0.08f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                    }
+                                ),
+                                border = BorderStroke(1.dp, polishColors.border.copy(alpha = 0.4f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .background(
+                                                    if (isWorkEnvironment) MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
+                                                    else polishColors.primary.copy(alpha = 0.15f),
+                                                    RoundedCornerShape(18.dp)
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isWorkEnvironment) Icons.Default.Work else Icons.Default.Home,
+                                                contentDescription = null,
+                                                tint = if (isWorkEnvironment) MaterialTheme.colorScheme.secondary else polishColors.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                text = if (isWorkEnvironment) "💼 Work Mode Active" else "🏡 Personal Mode Active",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isWorkEnvironment) MaterialTheme.colorScheme.secondary else polishColors.primary
+                                            )
+                                            Text(
+                                                text = if (isWorkEnvironment) {
+                                                    "Shows current week. Alarms: 8am list, 5-min, 1-min sticky."
+                                                } else {
+                                                    "Shows next 3 weeks. Normal workday & personal alarm triggers."
+                                                },
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = polishColors.onSurfaceVariant.copy(alpha = 0.8f)
+                                              )
+                                        }
+                                    }
+                                    Switch(
+                                        checked = isWorkEnvironment,
+                                        onCheckedChange = { viewModel.toggleWorkEnvironment() },
+                                        modifier = Modifier.testTag("environment_mode_switch"),
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = MaterialTheme.colorScheme.secondary,
+                                            checkedTrackColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
+                                            uncheckedThumbColor = polishColors.primary,
+                                            uncheckedTrackColor = polishColors.primary.copy(alpha = 0.4f)
+                                        )
+                                    )
                                 }
                             }
                         }
