@@ -137,9 +137,12 @@ fun MainScreen(
     var selectedTab by remember { mutableStateOf(0) }
     val now = System.currentTimeMillis()
     
-    val filteredEvents = remember(events) {
+    val isWorkEnvironment by viewModel.isWorkEnvironment.collectAsStateWithLifecycle()
+
+    val filteredEvents = remember(events, isWorkEnvironment) {
         val nowTime = System.currentTimeMillis()
-        events.filter { it.dateTimeMillis >= nowTime && it.dateTimeMillis <= nowTime + 3L * 7 * 24 * 60 * 60 * 1000 }
+        val limit = if (isWorkEnvironment) 7L * 24 * 60 * 60 * 1000 else 3L * 7 * 24 * 60 * 60 * 1000
+        events.filter { it.dateTimeMillis >= nowTime && it.dateTimeMillis <= nowTime + limit }
     }
 
     Column(
@@ -274,8 +277,8 @@ fun MainScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 2.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    .padding(top = 0.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -290,7 +293,11 @@ fun MainScreen(
                                             color = polishColors.primary
                                         )
                                         Text(
-                                            text = "Showing upcoming events (next 3 weeks). Alarms active for next 2 weeks.",
+                                            text = if (isWorkEnvironment) {
+                                                "Work Environment: Alarms scheduled for current week."
+                                            } else {
+                                                "Personal Environment: Alarms scheduled for next 2 weeks."
+                                            },
                                             style = MaterialTheme.typography.bodySmall,
                                             color = polishColors.onSurfaceVariant.copy(alpha = 0.7f)
                                         )
@@ -307,6 +314,85 @@ fun MainScreen(
                                         )
                                     }
                                 }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                // Beautiful, high-contrast Work vs Personal Environment Switch Card
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isWorkEnvironment) {
+                                            polishColors.primary.copy(alpha = 0.08f)
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                        }
+                                    ),
+                                    border = BorderStroke(1.dp, polishColors.border.copy(alpha = 0.4f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .background(
+                                                        if (isWorkEnvironment) MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
+                                                        else polishColors.primary.copy(alpha = 0.15f),
+                                                        RoundedCornerShape(18.dp)
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isWorkEnvironment) Icons.Default.Work else Icons.Default.Home,
+                                                    contentDescription = null,
+                                                    tint = if (isWorkEnvironment) MaterialTheme.colorScheme.secondary else polishColors.primary,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = if (isWorkEnvironment) "💼 Work Mode Active" else "🏡 Personal Mode Active",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isWorkEnvironment) MaterialTheme.colorScheme.secondary else polishColors.primary
+                                                )
+                                                Text(
+                                                    text = if (isWorkEnvironment) {
+                                                        "Shows current week. Alarms: 8am list, 5-min, 1-min sticky."
+                                                    } else {
+                                                        "Shows next 3 weeks. Normal workday & personal alarm triggers."
+                                                    },
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = polishColors.onSurfaceVariant.copy(alpha = 0.8f)
+                                                )
+                                            }
+                                        }
+                                        Switch(
+                                            checked = isWorkEnvironment,
+                                            onCheckedChange = { viewModel.toggleWorkEnvironment() },
+                                            modifier = Modifier.testTag("environment_mode_switch"),
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = MaterialTheme.colorScheme.secondary,
+                                                checkedTrackColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f),
+                                                uncheckedThumbColor = polishColors.primary,
+                                                uncheckedTrackColor = polishColors.primary.copy(alpha = 0.4f)
+                                            )
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
 
                                 // Prominent, beautiful Sync button underneath the title headers
                                 Button(
@@ -330,7 +416,8 @@ fun MainScreen(
                                         containerColor = polishColors.primary,
                                         contentColor = Color.White
                                     ),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(vertical = 10.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Sync,
@@ -408,7 +495,8 @@ fun MainScreen(
                                         } catch (e: Exception) {
                                             Toast.makeText(context, "Google Calendar app not found.", Toast.LENGTH_SHORT).show()
                                         }
-                                    }
+                                    },
+                                    isWorkEnvironment = isWorkEnvironment
                                 )
                             }
                         }
@@ -897,7 +985,8 @@ fun EventItemCard(
     event: Event,
     onDelete: () -> Unit,
     onToggleEmail: () -> Unit,
-    onSyncCalendar: () -> Unit
+    onSyncCalendar: () -> Unit,
+    isWorkEnvironment: Boolean = false
 ) {
     val currentTime = System.currentTimeMillis()
     val eventDate = Date(event.dateTimeMillis)
@@ -956,8 +1045,8 @@ fun EventItemCard(
                         
                         Box(
                             modifier = Modifier
-                                .background(badgeBg, RoundedCornerShape(8.dp))
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                        .background(badgeBg, RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = badgeLabel,
@@ -1023,22 +1112,50 @@ fun EventItemCard(
                 )
             }
 
-            // Workday checklist controls (HTML Sticky Notification Style!)
-            if (event.isWorkday) {
+            // Workday or Work Environment checklist controls
+            val showChecklist = isWorkEnvironment || event.isWorkday
+            if (showChecklist) {
+                val actionLabel = if (isWorkEnvironment) "Joined Meeting" else "Work Email Sent"
+                val statusLabel = if (isWorkEnvironment) "MEETING JOINED" else "EMAIL SENT"
+                val defaultStatusLabel = if (isWorkEnvironment) "STICKY PROMPT" else "STICKY PROMPT"
+                val defaultActionLabel = if (isWorkEnvironment) "Mark as Joined" else "Confirm Work Email Sent"
+                val actionBtnLabel = if (isWorkEnvironment) {
+                    if (event.isEmailSent) "Reset" else "Join"
+                } else {
+                    if (event.isEmailSent) "Reset" else "Mark Sent"
+                }
+                val icon = if (isWorkEnvironment) {
+                    if (event.isEmailSent) Icons.Default.CheckCircle else Icons.Default.Call
+                } else {
+                    if (event.isEmailSent) Icons.Default.MailOutline else Icons.Default.Mail
+                }
+
                 val containerBg = if (event.isEmailSent) {
                     if (isDark) Color(0xFF1B3D21) else Color(0xFFE8F5E9)
                 } else {
-                    polishColors.stickyBg
+                    if (isWorkEnvironment) {
+                        if (isDark) Color(0xFF1F2B36) else Color(0xFFE3F2FD)
+                    } else {
+                        polishColors.stickyBg
+                    }
                 }
                 val borderStrokeColor = if (event.isEmailSent) {
                     if (isDark) Color(0xFF2E7D32) else Color(0xFFA5D6A7)
                 } else {
-                    polishColors.stickyBorder
+                    if (isWorkEnvironment) {
+                        if (isDark) Color(0xFF1976D2) else Color(0xFF90CAF9)
+                    } else {
+                        polishColors.stickyBorder
+                    }
                 }
                 val textColor = if (event.isEmailSent) {
                     if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32)
                 } else {
-                    polishColors.stickyButton
+                    if (isWorkEnvironment) {
+                        if (isDark) Color(0xFF90CAF9) else Color(0xFF1565C0)
+                    } else {
+                        polishColors.stickyButton
+                    }
                 }
 
                 Surface(
@@ -1065,12 +1182,12 @@ fun EventItemCard(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = if (event.isEmailSent) Icons.Default.MailOutline else Icons.Default.Mail,
+                                    imageVector = icon,
                                     contentDescription = null,
                                     tint = if (event.isEmailSent) {
                                         if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32)
                                     } else {
-                                        polishColors.alarmText
+                                        textColor
                                     },
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -1078,7 +1195,7 @@ fun EventItemCard(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = if (event.isEmailSent) "EMAIL SENT" else "STICKY PROMPT",
+                                    text = if (event.isEmailSent) statusLabel else defaultStatusLabel,
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Bold,
                                         letterSpacing = 0.5.sp
@@ -1086,7 +1203,7 @@ fun EventItemCard(
                                     color = textColor.copy(alpha = 0.8f)
                                 )
                                 Text(
-                                    text = if (event.isEmailSent) "Work Email Confirmed" else "Confirm Work Email Sent",
+                                    text = if (event.isEmailSent) actionLabel else defaultActionLabel,
                                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                                     color = textColor
                                 )
@@ -1099,16 +1216,16 @@ fun EventItemCard(
                                 containerColor = if (event.isEmailSent) {
                                     if (isDark) Color(0xFF2E7D32) else Color(0xFF2E7D32)
                                 } else {
-                                    polishColors.stickyButton
+                                    textColor
                                 },
-                                contentColor = if (event.isEmailSent && isDark) Color.White else Color.White
+                                contentColor = Color.White
                             ),
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.height(34.dp)
                         ) {
                             Text(
-                                text = if (event.isEmailSent) "Reset" else "Mark Sent",
+                                text = actionBtnLabel,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )

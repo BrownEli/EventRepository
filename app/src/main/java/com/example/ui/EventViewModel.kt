@@ -28,8 +28,14 @@ import kotlinx.coroutines.withContext
 class EventViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: EventRepository
     private val alarmScheduler: AlarmScheduler
+    private val sharedPrefs = application.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
 
     val allEvents: StateFlow<List<Event>>
+    
+    val isWorkEnvironmentState = kotlinx.coroutines.flow.MutableStateFlow(
+        sharedPrefs.getBoolean("is_work_environment", false)
+    )
+    val isWorkEnvironment: StateFlow<Boolean> = isWorkEnvironmentState
 
     init {
         val database = AppDatabase.getDatabase(application)
@@ -41,6 +47,32 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+    }
+
+    fun toggleWorkEnvironment() {
+        viewModelScope.launch {
+            val newValue = !isWorkEnvironmentState.value
+            sharedPrefs.edit().putBoolean("is_work_environment", newValue).apply()
+            isWorkEnvironmentState.value = newValue
+            
+            // Reschedule all alarms
+            rescheduleAllAlarms()
+        }
+    }
+
+    private fun rescheduleAllAlarms() {
+        viewModelScope.launch {
+            try {
+                val events = repository.getAllEventsList()
+                for (event in events) {
+                    alarmScheduler.cancelAlarmsForEvent(event)
+                    alarmScheduler.scheduleAlarmsForEvent(event)
+                }
+                Log.d("EventViewModel", "Rescheduled alarms for ${events.size} events after switching environment.")
+            } catch (e: Exception) {
+                Log.e("EventViewModel", "Error rescheduling alarms: ${e.message}", e)
+            }
+        }
     }
 
     fun addEvent(title: String, description: String, dateTimeMillis: Long, isWorkday: Boolean) {

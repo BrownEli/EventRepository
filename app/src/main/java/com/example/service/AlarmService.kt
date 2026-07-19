@@ -21,6 +21,7 @@ import com.example.MainActivity
 import com.example.data.AppDatabase
 import com.example.data.EventRepository
 import com.example.receiver.AlarmScheduler
+import java.util.Calendar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -42,6 +43,7 @@ class AlarmService : Service() {
         const val ACTION_MARK_SENT = "com.example.action.MARK_EMAIL_SENT"
         const val ACTION_DISMISS = "com.example.action.DISMISS_ALARM"
         const val ACTION_NOTIFICATION_DISMISSED = "com.example.action.NOTIFICATION_DISMISSED"
+        const val ACTION_JOIN_MEETING = "com.example.action.JOIN_MEETING"
     }
 
     override fun onCreate() {
@@ -56,7 +58,10 @@ class AlarmService : Service() {
         val isWorkday = intent?.getBooleanExtra("IS_WORKDAY", false) ?: false
         val action = intent?.action ?: ACTION_START
 
-        Log.d(TAG, "onStartCommand: action=$action, eventId=$eventId, title=$eventTitle, isWorkday=$isWorkday")
+        val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val isWorkEnvironment = prefs.getBoolean("is_work_environment", false)
+
+        Log.d(TAG, "onStartCommand: action=$action, eventId=$eventId, title=$eventTitle, isWorkday=$isWorkday, isWorkEnvironment=$isWorkEnvironment")
 
         if (eventId == -1) {
             stopSelf()
@@ -68,16 +73,72 @@ class AlarmService : Service() {
                 // Play alarm and start vibration
                 startAlarmSound()
                 startVibration()
-                // Show initial alarm notification
-                val notification = buildAlarmNotification(eventId, eventTitle, reminderLabel, isWorkday, false)
-                startForeground(NOTIFICATION_ID, notification)
+
+                if (isWorkEnvironment) {
+                    if (reminderLabel == "Daily Digest") {
+                        // Show initial notification
+                        val initialNotification = buildWorkDailyDigestNotification(eventId, eventTitle, "Loading meetings for today...")
+                        startForeground(NOTIFICATION_ID, initialNotification)
+
+                        // Async fetch from DB to show real meetings for today
+                        serviceScope.launch {
+                            try {
+                                val db = AppDatabase.getDatabase(this@AlarmService)
+                                val repo = EventRepository(db.eventDao())
+                                val allEvents = repo.getAllEventsList()
+
+                                val todayCal = Calendar.getInstance()
+                                val todayYear = todayCal.get(Calendar.YEAR)
+                                val todayDayOfYear = todayCal.get(Calendar.DAY_OF_YEAR)
+
+                                val todayEvents = allEvents.filter { event ->
+                                    val cal = Calendar.getInstance().apply { timeInMillis = event.dateTimeMillis }
+                                    cal.get(Calendar.YEAR) == todayYear && cal.get(Calendar.DAY_OF_YEAR) == todayDayOfYear
+                                }.sortedBy { it.dateTimeMillis }
+
+                                val bodyText = if (todayEvents.isEmpty()) {
+                                    "No meetings or events scheduled for today!"
+                                } else {
+                                    val sdf = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
+                                    todayEvents.joinToString(separator = "\n") { event ->
+                                        "• ${sdf.format(java.util.Date(event.dateTimeMillis))}: ${event.title}"
+                                    }
+                                }
+
+                                val finalNotification = buildWorkDailyDigestNotification(eventId, eventTitle, bodyText)
+                                val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                                notificationManager.notify(NOTIFICATION_ID, finalNotification)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error generating Work Environment Daily Digest: ${e.message}", e)
+                            }
+                        }
+                    } else {
+                        // Standard work alarms
+                        val notification = buildWorkAlarmNotification(eventId, eventTitle, reminderLabel, false)
+                        startForeground(NOTIFICATION_ID, notification)
+                    }
+                } else {
+                    // Show initial alarm notification (Personal)
+                    val notification = buildAlarmNotification(eventId, eventTitle, reminderLabel, isWorkday, false)
+                    startForeground(NOTIFICATION_ID, notification)
+                }
             }
             ACTION_SILENCE -> {
                 stopAlarmSound()
                 stopVibration()
                 isSilenced = true
-                
-                if (isWorkday) {
+
+                if (isWorkEnvironment) {
+                    if (reminderLabel == "1 Minute Before") {
+                        val notification = buildWorkAlarmNotification(eventId, eventTitle, reminderLabel, silenced = true)
+                        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        notificationManager.notify(NOTIFICATION_ID, notification)
+                        Log.d(TAG, "Work Alarm silenced. Sticky meeting notification remains.")
+                    } else {
+                        Log.d(TAG, "Non-sticky work alarm silenced. Stopping service.")
+                        stopSelf()
+                    }
+                } else if (isWorkday) {
                     // Update notification to remain sticky, telling them they must mark email as sent
                     val notification = buildAlarmNotification(eventId, eventTitle, reminderLabel, isWorkday = true, silenced = true)
                     val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -99,6 +160,13 @@ class AlarmService : Service() {
                 stopAlarmSound()
                 stopVibration()
                 markEmailAsSent(eventId)
+                stopSelf()
+            }
+            ACTION_JOIN_MEETING -> {
+                Log.d(TAG, "Joined meeting: eventId=$eventId. Stopping service.")
+                stopAlarmSound()
+                stopVibration()
+                markEmailAsSent(eventId) // Reuse same column to indicate completion
                 stopSelf()
             }
             ACTION_DISMISS -> {
@@ -414,6 +482,235 @@ class AlarmService : Service() {
             val dismissPendingIntent = PendingIntent.getService(
                 this,
                 eventId * 10 + 106,
+                dismissIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                "Dismiss",
+                dismissPendingIntent
+            )
+        }
+
+        return builder.build()
+    }
+
+    private fun buildWorkDailyDigestNotification(
+        eventId: Int,
+        eventTitle: String,
+        bodyText: String
+    ): Notification {
+        val appIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val appPendingIntent = PendingIntent.getActivity(
+            this,
+            eventId * 10 + 200,
+            appIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val dismissIntent = Intent(this, AlarmService::class.java).apply {
+            action = ACTION_DISMISS
+            putExtra("EVENT_ID", eventId)
+        }
+        val dismissPendingIntent = PendingIntent.getService(
+            this,
+            eventId * 10 + 201,
+            dismissIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle("📅 Today's Work Schedule")
+            .setContentText("Tap to open. Swipe or click dismiss to close.")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Here are your meetings & events scheduled for today:\n\n$bodyText"))
+            .setContentIntent(appPendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(false) // Non-sticky!
+            .setAutoCancel(true)
+            .setColor(0xFF00639B.toInt())
+            .setColorized(true)
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                "Dismiss",
+                dismissPendingIntent
+            )
+            .build()
+    }
+
+    private fun buildWorkAlarmNotification(
+        eventId: Int,
+        eventTitle: String,
+        reminderLabel: String,
+        silenced: Boolean
+    ): Notification {
+        val appIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val appPendingIntent = PendingIntent.getActivity(
+            this,
+            eventId * 10 + 300,
+            appIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentIntent(appPendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setColor(0xFF00639B.toInt()) // Work blue color
+            .setColorized(true)
+
+        val deleteIntent = Intent(this, AlarmService::class.java).apply {
+            action = ACTION_NOTIFICATION_DISMISSED
+            putExtra("EVENT_ID", eventId)
+            putExtra("REMINDER_LABEL", reminderLabel)
+            putExtra("EVENT_TITLE", eventTitle)
+        }
+        val deletePendingIntent = PendingIntent.getService(
+            this,
+            eventId * 10 + 307,
+            deleteIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        builder.setDeleteIntent(deletePendingIntent)
+
+        if (reminderLabel == "1 Minute Before") {
+            builder.setOngoing(true)
+                .setAutoCancel(false)
+
+            if (silenced) {
+                val title = "🤝 Join Meeting: $eventTitle"
+                val body = "🛡️ WORK ENVIRONMENT ACTIVE\n\nMeeting: $eventTitle\nStatus: Alarm silenced, but notification remains active.\n\n⚠️ Action Required:\nYou must join or mark this meeting as joined to dismiss this notification."
+                
+                builder.setContentTitle(title)
+                    .setContentText("Meeting is starting immediately. Mark joined to dismiss.")
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+
+                // Action to Join Meeting
+                val joinIntent = Intent(this, AlarmService::class.java).apply {
+                    action = ACTION_JOIN_MEETING
+                    putExtra("EVENT_ID", eventId)
+                }
+                val joinPendingIntent = PendingIntent.getService(
+                    this,
+                    eventId * 10 + 310,
+                    joinIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                builder.addAction(
+                    android.R.drawable.ic_menu_call,
+                    "Join Meeting",
+                    joinPendingIntent
+                )
+            } else {
+                val title = "🚨 Meeting Starting: $eventTitle"
+                val body = "⏰ Reminder: 1 Minute Before\n\n💼 WORK ENVIRONMENT ACTIVE\nThe meeting starts in 1 minute. Please join now!\n\n⚠️ This is a sticky alarm. You must mark as Joined to dismiss."
+
+                builder.setContentTitle(title)
+                    .setContentText("Meeting starting in 1 minute. Join now!")
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+
+                // Silence button
+                val silenceIntent = Intent(this, AlarmService::class.java).apply {
+                    action = ACTION_SILENCE
+                    putExtra("EVENT_ID", eventId)
+                    putExtra("REMINDER_LABEL", reminderLabel)
+                    putExtra("EVENT_TITLE", eventTitle)
+                }
+                val silencePendingIntent = PendingIntent.getService(
+                    this,
+                    eventId * 10 + 311,
+                    silenceIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                builder.addAction(
+                    android.R.drawable.ic_media_pause,
+                    "Silence Sound",
+                    silencePendingIntent
+                )
+
+                // Join Meeting button
+                val joinIntent = Intent(this, AlarmService::class.java).apply {
+                    action = ACTION_JOIN_MEETING
+                    putExtra("EVENT_ID", eventId)
+                }
+                val joinPendingIntent = PendingIntent.getService(
+                    this,
+                    eventId * 10 + 312,
+                    joinIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                builder.addAction(
+                    android.R.drawable.ic_menu_call,
+                    "Join Meeting",
+                    joinPendingIntent
+                )
+
+                // Snooze button
+                val snoozeIntent = Intent(this, AlarmService::class.java).apply {
+                    action = ACTION_SNOOZE
+                    putExtra("EVENT_ID", eventId)
+                    putExtra("REMINDER_LABEL", reminderLabel)
+                    putExtra("EVENT_TITLE", eventTitle)
+                }
+                val snoozePendingIntent = PendingIntent.getService(
+                    this,
+                    eventId * 10 + 313,
+                    snoozeIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                builder.addAction(
+                    android.R.drawable.ic_menu_recent_history,
+                    "Snooze (5 min)",
+                    snoozePendingIntent
+                )
+            }
+        } else {
+            // Non-sticky: "5 Minutes Before" or other work reminders
+            builder.setOngoing(false)
+                .setAutoCancel(true)
+
+            val title = "⏱️ Meeting in 5 Mins: $eventTitle"
+            val body = "⏰ Reminder: 5 Minutes Before\n\n💼 WORK ENVIRONMENT ACTIVE\nYour meeting starts soon. Tap to view or prepare."
+
+            builder.setContentTitle(title)
+                .setContentText("Meeting starting in 5 minutes.")
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+
+            // Snooze button
+            val snoozeIntent = Intent(this, AlarmService::class.java).apply {
+                action = ACTION_SNOOZE
+                putExtra("EVENT_ID", eventId)
+                putExtra("REMINDER_LABEL", reminderLabel)
+                putExtra("EVENT_TITLE", eventTitle)
+            }
+            val snoozePendingIntent = PendingIntent.getService(
+                this,
+                eventId * 10 + 314,
+                snoozeIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(
+                android.R.drawable.ic_menu_recent_history,
+                "Snooze (5 min)",
+                snoozePendingIntent
+            )
+
+            // Dismiss button
+            val dismissIntent = Intent(this, AlarmService::class.java).apply {
+                action = ACTION_DISMISS
+                putExtra("EVENT_ID", eventId)
+            }
+            val dismissPendingIntent = PendingIntent.getService(
+                this,
+                eventId * 10 + 315,
                 dismissIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )

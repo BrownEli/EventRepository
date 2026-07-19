@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import com.example.data.Event
+import java.util.Calendar
 
 class AlarmScheduler(private val context: Context) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -22,6 +23,32 @@ class AlarmScheduler(private val context: Context) {
                 Triple("1 Minute Before", dateTimeMillis - 1L * 60 * 1000, 4),
                 Triple("Day of the Event", dateTimeMillis, 5)
             )
+        }
+    }
+
+    fun isWorkEnvironment(): Boolean {
+        val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        return prefs.getBoolean("is_work_environment", false)
+    }
+
+    fun getActiveReminderTypes(dateTimeMillis: Long): List<Triple<String, Long, Int>> {
+        if (isWorkEnvironment()) {
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = dateTimeMillis
+                set(Calendar.HOUR_OF_DAY, 8)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val dailyDigestTime = cal.timeInMillis
+
+            return listOf(
+                Triple("Daily Digest", dailyDigestTime, 6),
+                Triple("5 Minutes Before", dateTimeMillis - 5L * 60 * 1000, 7),
+                Triple("1 Minute Before", dateTimeMillis - 1L * 60 * 1000, 8)
+            )
+        } else {
+            return getReminderTypes(dateTimeMillis)
         }
     }
 
@@ -43,7 +70,7 @@ class AlarmScheduler(private val context: Context) {
             return
         }
 
-        val reminders = getReminderTypes(event.dateTimeMillis)
+        val reminders = getActiveReminderTypes(event.dateTimeMillis)
 
         for ((label, triggerTime, codeOffset) in reminders) {
             if (triggerTime > currentTime) {
@@ -121,8 +148,8 @@ class AlarmScheduler(private val context: Context) {
     }
 
     fun cancelAlarmsForEvent(event: Event) {
-        val reminders = getReminderTypes(event.dateTimeMillis)
-        for ((_, _, codeOffset) in reminders) {
+        val allOffsets = listOf(1, 2, 3, 4, 5, 6, 7, 8)
+        for (codeOffset in allOffsets) {
             val requestCode = event.id * 10 + codeOffset
             val intent = Intent(context, AlarmReceiver::class.java)
             val pendingIntent = PendingIntent.getBroadcast(
