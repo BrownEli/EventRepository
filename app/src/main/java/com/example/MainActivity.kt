@@ -138,58 +138,10 @@ fun MainScreen(
     val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
     val userName by viewModel.userName.collectAsStateWithLifecycle()
 
-    val filteredEvents = remember(events, isWorkEnvironment, userEmail, userName) {
+    val filteredEvents = remember(events, isWorkEnvironment) {
         val nowTime = System.currentTimeMillis()
         val limit = if (isWorkEnvironment) 7L * 24 * 60 * 60 * 1000 else 3L * 7 * 24 * 60 * 60 * 1000
-        val timeFiltered = events.filter { it.dateTimeMillis >= nowTime && it.dateTimeMillis <= nowTime + limit }
-        
-        if (isWorkEnvironment) {
-            val emailPrefix = userEmail.substringBefore("@")
-            val firstName = userName.substringBefore(" ")
-            
-            timeFiltered.filter { event ->
-                val desc = event.description
-                val title = event.title
-                
-                // If it is manually created (i.e. not synced from GCal), keep it
-                val isSynced = desc.contains("Synced from calendar:", ignoreCase = true) || desc.contains("[Calendar:", ignoreCase = true)
-                if (!isSynced) {
-                    true
-                } else {
-                    // Extract calendar name
-                    val calName = if (desc.contains("[Calendar:", ignoreCase = true)) {
-                        desc.substringAfter("[Calendar:").substringBefore("]").trim()
-                    } else if (desc.contains("Synced from calendar:", ignoreCase = true)) {
-                        desc.substringAfter("Synced from calendar:").trim()
-                    } else {
-                        ""
-                    }
-                    
-                    val isPersonalCal = (userName.isNotBlank() && calName.equals(userName, ignoreCase = true)) ||
-                            calName.contains("personal", ignoreCase = true) ||
-                            calName.contains("private", ignoreCase = true) ||
-                            calName.contains("my calendar", ignoreCase = true) ||
-                            (userEmail.isNotBlank() && calName.contains(userEmail, ignoreCase = true)) ||
-                            (emailPrefix.isNotBlank() && calName.contains(emailPrefix, ignoreCase = true)) ||
-                            (firstName.isNotBlank() && calName.contains(firstName, ignoreCase = true)) ||
-                            calName.equals("Calendar", ignoreCase = true) ||
-                            calName.equals("Birthdays", ignoreCase = true) ||
-                            calName.equals("Tasks", ignoreCase = true)
-                            
-                    val isRelatedToEmail = (userEmail.isNotBlank() && (
-                                title.contains(userEmail, ignoreCase = true) ||
-                                desc.contains(userEmail, ignoreCase = true)
-                            )) || (firstName.isNotBlank() && (
-                                title.contains(firstName, ignoreCase = true) ||
-                                desc.contains(firstName, ignoreCase = true)
-                            ))
-                            
-                    isPersonalCal || isRelatedToEmail
-                }
-            }
-        } else {
-            timeFiltered
-        }
+        events.filter { it.dateTimeMillis >= nowTime && it.dateTimeMillis <= nowTime + limit }
     }
 
     Scaffold(
