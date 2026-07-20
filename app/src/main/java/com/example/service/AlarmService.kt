@@ -71,9 +71,35 @@ class AlarmService : Service() {
 
         when (action) {
             ACTION_START, ACTION_START + "_ALT" -> {
-                // Play alarm and start vibration
-                startAlarmSound()
-                startVibration()
+                var eventHasLink = isMeeting
+                if (eventId != -1) {
+                    try {
+                        val db = AppDatabase.getDatabase(this@AlarmService)
+                        val event = kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                            db.eventDao().getEventById(eventId)
+                        }
+                        if (event != null) {
+                            eventHasLink = event.hasGoogleMeetLink
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error fetching event inside onStartCommand: ${e.message}", e)
+                    }
+                }
+
+                val shouldPlayAlarm = if (isWorkEnvironment) {
+                    eventHasLink && (reminderLabel == "2 Minutes Before" || reminderLabel == "1 Minute Before")
+                } else {
+                    true
+                }
+
+                if (shouldPlayAlarm) {
+                    // Play alarm and start vibration
+                    startAlarmSound()
+                    startVibration()
+                } else if (isWorkEnvironment && reminderLabel != "Daily Digest") {
+                    // Alert with a default sound instead of full ongoing alarm
+                    playDefaultNotificationSound()
+                }
 
                 if (isWorkEnvironment) {
                     if (reminderLabel == "Daily Digest") {
@@ -130,7 +156,7 @@ class AlarmService : Service() {
                 isSilenced = true
 
                 if (isWorkEnvironment) {
-                    if (reminderLabel == "1 Minute Before") {
+                    if (reminderLabel == "2 Minutes Before" || reminderLabel == "1 Minute Before") {
                         val notification = buildWorkAlarmNotification(eventId, eventTitle, reminderLabel, silenced = true, isMeeting = isMeeting)
                         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                         notificationManager.notify(NOTIFICATION_ID, notification)
@@ -216,6 +242,16 @@ class AlarmService : Service() {
             Log.e(TAG, "Error stopping media player: ${e.message}")
         } finally {
             mediaPlayer = null
+        }
+    }
+
+    private fun playDefaultNotificationSound() {
+        try {
+            val notificationUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val ringtone = RingtoneManager.getRingtone(applicationContext, notificationUri)
+            ringtone?.play()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error playing default notification sound: ${e.message}", e)
         }
     }
 
@@ -584,7 +620,7 @@ class AlarmService : Service() {
         )
         builder.setDeleteIntent(deletePendingIntent)
 
-        if (reminderLabel == "1 Minute Before") {
+        if (reminderLabel == "2 Minutes Before" || reminderLabel == "1 Minute Before") {
             builder.setOngoing(true)
                 .setAutoCancel(false)
 
@@ -620,13 +656,13 @@ class AlarmService : Service() {
             } else {
                 val title = if (isMeeting) "🚨 Meeting Starting: $eventTitle" else "💼 Work Event Starting: $eventTitle"
                 val body = if (isMeeting) {
-                    "⏰ Reminder: 1 Minute Before\n\n💼 WORK ENVIRONMENT ACTIVE\nThe meeting starts in 1 minute. Please join now!\n\n⚠️ This is a sticky alarm. You must mark as Joined to dismiss."
+                    "⏰ Reminder: $reminderLabel\n\n💼 WORK ENVIRONMENT ACTIVE\nThe meeting starts soon. Please join now!\n\n⚠️ This is a sticky alarm. You must mark as Joined to dismiss."
                 } else {
-                    "⏰ Reminder: 1 Minute Before\n\n💼 WORK ENVIRONMENT ACTIVE\nThe event starts in 1 minute. Please prepare now!\n\n⚠️ This is a sticky alarm. You must mark as Completed to dismiss."
+                    "⏰ Reminder: $reminderLabel\n\n💼 WORK ENVIRONMENT ACTIVE\nThe event starts soon. Please prepare now!\n\n⚠️ This is a sticky alarm. You must mark as Completed to dismiss."
                 }
 
                 builder.setContentTitle(title)
-                    .setContentText(if (isMeeting) "Meeting starting in 1 minute. Join now!" else "Event starting in 1 minute. Prepare now!")
+                    .setContentText(if (isMeeting) "Meeting starting soon. Join now!" else "Event starting soon. Prepare now!")
                     .setStyle(NotificationCompat.BigTextStyle().bigText(body))
 
                 // Silence button
@@ -687,20 +723,30 @@ class AlarmService : Service() {
                     snoozePendingIntent
                 )
             }
-        } else {
-            // Non-sticky: "5 Minutes Before" or other work reminders
+        } else if (reminderLabel == "1 Hour Before") {
             builder.setOngoing(false)
                 .setAutoCancel(true)
 
-            val title = if (isMeeting) "⏱️ Meeting in 5 Mins: $eventTitle" else "⏱️ Work Event in 5 Mins: $eventTitle"
+            val title = "⏱️ Meeting in 1 Hour: $eventTitle"
+            val body = "⏰ Reminder: 1 Hour Before\n\n💼 WORK ENVIRONMENT ACTIVE\nYour meeting starts in 1 hour. Tap to view or prepare."
+
+            builder.setContentTitle(title)
+                .setContentText("Meeting starts in 1 hour: $eventTitle")
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+        } else {
+            // Non-sticky: "5 Minutes Before" or other work reminders (including non-meet events)
+            builder.setOngoing(false)
+                .setAutoCancel(true)
+
+            val title = if (isMeeting) "⏱️ Meeting soon: $eventTitle" else "⏱️ Work Event soon: $eventTitle"
             val body = if (isMeeting) {
-                "⏰ Reminder: 5 Minutes Before\n\n💼 WORK ENVIRONMENT ACTIVE\nYour meeting starts soon. Tap to view or prepare."
+                "⏰ Reminder: $reminderLabel\n\n💼 WORK ENVIRONMENT ACTIVE\nYour meeting starts soon. Tap to view or prepare."
             } else {
-                "⏰ Reminder: 5 Minutes Before\n\n💼 WORK ENVIRONMENT ACTIVE\nYour work event starts soon. Tap to view or prepare."
+                "⏰ Reminder: $reminderLabel\n\n💼 WORK ENVIRONMENT ACTIVE\nYour work event starts soon. Tap to view or prepare."
             }
 
             builder.setContentTitle(title)
-                .setContentText(if (isMeeting) "Meeting starting in 5 minutes." else "Event starting in 5 minutes.")
+                .setContentText(if (isMeeting) "Meeting starting soon." else "Event starting soon.")
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
 
             // Snooze button

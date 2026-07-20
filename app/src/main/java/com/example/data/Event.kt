@@ -15,6 +15,12 @@ data class Event(
     val isMeeting: Boolean
         get() = description.contains("meet.google.com", ignoreCase = true) || title.contains("Google Meet", ignoreCase = true)
 
+    val hasGoogleMeetLink: Boolean
+        get() = isMeeting || 
+                description.contains("meet.google.com", ignoreCase = true) || 
+                description.contains("google.com", ignoreCase = true) || 
+                title.contains("Google Meet", ignoreCase = true)
+
     // Utility to get next scheduled reminder
     fun getNextReminderText(currentTime: Long): String {
         val reminders = getReminderTimes()

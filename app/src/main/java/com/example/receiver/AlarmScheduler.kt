@@ -31,7 +31,8 @@ class AlarmScheduler(private val context: Context) {
         return prefs.getBoolean("is_work_environment", false)
     }
 
-    fun getActiveReminderTypes(dateTimeMillis: Long): List<Triple<String, Long, Int>> {
+    fun getActiveReminderTypes(event: Event): List<Triple<String, Long, Int>> {
+        val dateTimeMillis = event.dateTimeMillis
         if (isWorkEnvironment()) {
             val cal = Calendar.getInstance().apply {
                 timeInMillis = dateTimeMillis
@@ -42,11 +43,19 @@ class AlarmScheduler(private val context: Context) {
             }
             val dailyDigestTime = cal.timeInMillis
 
-            return listOf(
-                Triple("Daily Digest", dailyDigestTime, 6),
-                Triple("5 Minutes Before", dateTimeMillis - 5L * 60 * 1000, 7),
-                Triple("1 Minute Before", dateTimeMillis - 1L * 60 * 1000, 8)
-            )
+            if (event.hasGoogleMeetLink) {
+                return listOf(
+                    Triple("Daily Digest", dailyDigestTime, 6),
+                    Triple("1 Hour Before", dateTimeMillis - 1L * 60 * 60 * 1000, 9),
+                    Triple("2 Minutes Before", dateTimeMillis - 2L * 60 * 1000, 10)
+                )
+            } else {
+                return listOf(
+                    Triple("Daily Digest", dailyDigestTime, 6),
+                    Triple("5 Minutes Before", dateTimeMillis - 5L * 60 * 1000, 7),
+                    Triple("1 Minute Before", dateTimeMillis - 1L * 60 * 1000, 8)
+                )
+            }
         } else {
             return getReminderTypes(dateTimeMillis)
         }
@@ -70,7 +79,7 @@ class AlarmScheduler(private val context: Context) {
             return
         }
 
-        val reminders = getActiveReminderTypes(event.dateTimeMillis)
+        val reminders = getActiveReminderTypes(event)
 
         for ((label, triggerTime, codeOffset) in reminders) {
             if (triggerTime > currentTime) {
@@ -151,7 +160,7 @@ class AlarmScheduler(private val context: Context) {
     }
 
     fun cancelAlarmsForEvent(event: Event) {
-        val allOffsets = listOf(1, 2, 3, 4, 5, 6, 7, 8)
+        val allOffsets = listOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
         for (codeOffset in allOffsets) {
             val requestCode = event.id * 10 + codeOffset
             val intent = Intent(context, AlarmReceiver::class.java)

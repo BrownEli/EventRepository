@@ -76,11 +76,21 @@ class EventWidgetProvider : AppWidgetProvider() {
             val views = RemoteViews(context.packageName, R.layout.event_widget)
 
             try {
+                val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+                val isWorkEnvironment = prefs.getBoolean("is_work_environment", false)
+
                 val db = AppDatabase.getDatabase(context)
                 val now = System.currentTimeMillis()
                 val allEvents = db.eventDao().getAllEventsList()
                 val upcomingEvents = allEvents
                     .filter { it.dateTimeMillis > now }
+                    .filter { event ->
+                        if (isWorkEnvironment) {
+                            event.hasGoogleMeetLink
+                        } else {
+                            true
+                        }
+                    }
                     .sortedBy { it.dateTimeMillis }
 
                 val count = upcomingEvents.size
