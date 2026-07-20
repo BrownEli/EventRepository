@@ -182,6 +182,27 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun toggleEventMode(event: Event, isWorkEnvironment: Boolean) {
+        viewModelScope.launch {
+            try {
+                // Cancel existing alarms
+                alarmScheduler.cancelAlarmsForEvent(event)
+                val updatedEvent = if (isWorkEnvironment) {
+                    event.copy(isImportant = !event.isImportant)
+                } else {
+                    event.copy(isWorkday = !event.isWorkday)
+                }
+                repository.update(updatedEvent)
+                // Schedule new alarms based on the updated event!
+                alarmScheduler.scheduleAlarmsForEvent(updatedEvent)
+                com.example.receiver.EventWidgetProvider.triggerUpdate(getApplication())
+                Log.d("EventViewModel", "Toggled event mode for Event: ${event.id}, isWork=$isWorkEnvironment")
+            } catch (e: Exception) {
+                Log.e("EventViewModel", "Error toggling event mode: ${e.message}", e)
+            }
+        }
+    }
+
     /**
      * Triggers an immediate alarm for testing purposes (starts in 5 seconds)
      */

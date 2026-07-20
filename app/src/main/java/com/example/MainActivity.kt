@@ -282,7 +282,7 @@ fun MainScreen(
                                     val calendarIntent = Intent(Intent.ACTION_INSERT).apply {
                                         data = CalendarContract.Events.CONTENT_URI
                                         putExtra(CalendarContract.Events.TITLE, title)
-                                        putExtra(CalendarContract.Events.DESCRIPTION, desc + "\n\n[Reminders configured in Calendar Event Alarms app]")
+                                        putExtra(CalendarContract.Events.DESCRIPTION, desc + "\n\n[Reminders configured in Alarm Me app]")
                                         putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, time)
                                         putExtra(CalendarContract.EXTRA_EVENT_END_TIME, time + 60 * 60 * 1000) // 1 hour
                                         putExtra(CalendarContract.Events.ACCESS_LEVEL, CalendarContract.Events.ACCESS_PRIVATE)
@@ -504,7 +504,7 @@ fun MainScreen(
                                         .padding(16.dp)
                                 ) {
                                     Text(
-                                        text = "Calendar Event Alarms",
+                                        text = "Alarm Me",
                                         style = MaterialTheme.typography.titleLarge.copy(
                                             color = androidx.compose.ui.graphics.Color.White,
                                             fontWeight = FontWeight.Bold,
@@ -731,6 +731,7 @@ fun MainScreen(
                                     event = event,
                                     onDelete = { viewModel.deleteEvent(event) },
                                     onToggleEmail = { viewModel.toggleEmailSent(event) },
+                                    onToggleMode = { viewModel.toggleEventMode(event, isWorkEnvironment) },
                                     onSyncCalendar = {
                                         val calendarIntent = Intent(Intent.ACTION_INSERT).apply {
                                             data = CalendarContract.Events.CONTENT_URI
@@ -1092,6 +1093,59 @@ fun MainScreen(
                             }
                         }
 
+                        // 4. App Version and Build Info Card
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
+                                ),
+                                border = BorderStroke(1.dp, polishColors.border.copy(alpha = 0.15f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .background(
+                                                polishColors.primary.copy(alpha = 0.12f),
+                                                RoundedCornerShape(18.dp)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = polishColors.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = "App Information",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = polishColors.text
+                                        )
+                                        Text(
+                                            text = "Version Name: ${com.example.BuildConfig.VERSION_NAME}\nBuild Code: ${com.example.BuildConfig.VERSION_CODE}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = polishColors.onSurfaceVariant.copy(alpha = 0.8f),
+                                            lineHeight = 16.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         item {
                             Spacer(modifier = Modifier.height(32.dp))
                         }
@@ -1436,7 +1490,8 @@ fun EventItemCard(
     onDelete: () -> Unit,
     onToggleEmail: () -> Unit,
     onSyncCalendar: () -> Unit,
-    isWorkEnvironment: Boolean = false
+    isWorkEnvironment: Boolean = false,
+    onToggleMode: () -> Unit
 ) {
     val currentTime = System.currentTimeMillis()
     val eventDate = Date(event.dateTimeMillis)
@@ -1560,6 +1615,84 @@ fun EventItemCard(
                     color = polishColors.text,
                     fontWeight = FontWeight.Medium
                 )
+            }
+
+            // Interactive mode switch for Personal and Work Mode non-meet links
+            val showModeSwitch = if (isWorkEnvironment) {
+                !event.isMeeting
+            } else {
+                true
+            }
+
+            if (showModeSwitch) {
+                val switchLabel = if (isWorkEnvironment) "Is this event important?" else "Is this during the day?"
+                val switchChecked = if (isWorkEnvironment) event.isImportant else event.isWorkday
+                val switchIcon = if (isWorkEnvironment) Icons.Default.PriorityHigh else Icons.Default.WbSunny
+                val switchDesc = if (isWorkEnvironment) {
+                    if (event.isImportant) {
+                        "🔥 Important event. Alarms 1 day, 1 hour, and sticky 2m before."
+                    } else {
+                        "⏱️ Standard event. Standard default notifications."
+                    }
+                } else {
+                    if (event.isWorkday) {
+                        "☀️ During the day. Alarms require email confirmation to dismiss."
+                    } else {
+                        "🌙 Not during the day. Sticky alarms with no email required."
+                    }
+                }
+
+                Surface(
+                    color = polishColors.background,
+                    border = BorderStroke(0.5.dp, polishColors.border.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = switchIcon,
+                                    contentDescription = null,
+                                    tint = polishColors.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = switchLabel,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = polishColors.text
+                                )
+                            }
+                            Switch(
+                                checked = switchChecked,
+                                onCheckedChange = { onToggleMode() },
+                                modifier = Modifier.testTag("event_card_switch_${event.id}"),
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = polishColors.primary,
+                                    uncheckedThumbColor = polishColors.border,
+                                    uncheckedTrackColor = polishColors.background
+                                )
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = switchDesc,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = polishColors.onSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
             }
 
             // Workday or Work Environment checklist controls

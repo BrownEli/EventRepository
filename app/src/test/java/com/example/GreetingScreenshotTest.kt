@@ -23,7 +23,7 @@ class GreetingScreenshotTest {
   fun greeting_screenshot() {
     composeTestRule.setContent {
       MyApplicationTheme {
-        CreateEventCard(onAddEvent = { _, _, _, _ -> })
+        CreateEventCard(isWorkEnvironment = false, onAddEvent = { _, _, _, _, _ -> })
       }
     }
 

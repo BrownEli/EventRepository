@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Calendar Event Alarms"
+rootProject.name = "Alarm Me"
 
 include(":app")

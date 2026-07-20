@@ -1,5 +1,5 @@
 {
-  "name": "Calendar Event Alarms",
+  "name": "Alarm Me",
   "description": "An alarm clock for Google Calendar events with workday email verification.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

@@ -796,7 +796,7 @@ class AlarmService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Calendar Event Alarms Channel",
+                "Alarm Me Channel",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Used to display high-priority persistent alarms for appointments and deadlines"
