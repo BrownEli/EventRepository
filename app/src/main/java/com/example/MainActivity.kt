@@ -274,8 +274,9 @@ fun MainScreen(
                             Spacer(modifier = Modifier.height(16.dp))
                             // Create Event Card Form
                             CreateEventCard(
-                                onAddEvent = { title, desc, time, isWorkday ->
-                                    viewModel.addEvent(title, desc, time, isWorkday)
+                                isWorkEnvironment = isWorkEnvironment,
+                                onAddEvent = { title, desc, time, isWorkday, isImportant ->
+                                    viewModel.addEvent(title, desc, time, isWorkday, isImportant)
                                     
                                     // Trigger Google Calendar Insert Intent directly!
                                     val calendarIntent = Intent(Intent.ACTION_INSERT).apply {
@@ -1103,10 +1104,12 @@ fun MainScreen(
 
 @Composable
 fun CreateEventCard(
-    onAddEvent: (String, String, Long, Boolean) -> Unit
+    isWorkEnvironment: Boolean,
+    onAddEvent: (String, String, Long, Boolean, Boolean) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
+    var isImportant by remember { mutableStateOf(false) }
 
     val calendar = remember { Calendar.getInstance() }
     var selectedYear by remember { mutableStateOf(calendar.get(Calendar.YEAR)) }
@@ -1286,49 +1289,105 @@ fun CreateEventCard(
                 }
             }
 
-            // Workday toggles with helpful hint text
+            // Conditional toggles based on the active mode (Personal vs. Work)
+            val hasGoogleMeet = title.contains("Google Meet", ignoreCase = true) || description.contains("meet.google.com", ignoreCase = true)
+            val isImportantEffective = hasGoogleMeet || isImportant
+
             Surface(
                 color = polishColors.background,
                 border = BorderStroke(1.dp, polishColors.border.copy(alpha = 0.5f)),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Work,
-                                contentDescription = null,
-                                tint = polishColors.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Is this during a Workday?",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = polishColors.text
+                    if (!isWorkEnvironment) {
+                        // PERSONAL MODE: "Is this during the day?" switch
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.WbSunny,
+                                    contentDescription = null,
+                                    tint = polishColors.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Is this during the day?",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = polishColors.text
+                                )
+                            }
+                            Switch(
+                                checked = isWorkday,
+                                onCheckedChange = { isWorkday = it },
+                                modifier = Modifier.testTag("is_workday_switch"),
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = polishColors.primary,
+                                    uncheckedThumbColor = polishColors.border,
+                                    uncheckedTrackColor = polishColors.background
+                                )
                             )
                         }
-                        Switch(
-                            checked = isWorkday,
-                            onCheckedChange = { isWorkday = it },
-                            modifier = Modifier.testTag("is_workday_switch"),
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = polishColors.primary,
-                                uncheckedThumbColor = polishColors.border,
-                                uncheckedTrackColor = polishColors.background
-                            )
-                        )
-                    }
-                    if (isWorkday) {
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "If enabled, your alarm triggers a mandatory email reminder check. The ringing sound can be silenced, but the persistent system notification cannot be swiped away until you mark the job email as sent.",
+                            text = if (isWorkday) {
+                                "☀️ Marked as occurring during the day. Activates the workday exception protocol, requiring email confirmation to dismiss."
+                            } else {
+                                "🌙 Marked as not during the day. Alarms will be sticky and ring, but no email confirmation is required to dismiss."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = polishColors.onSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
+                    } else {
+                        // WORK MODE: "Is this event important?" switch
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.PriorityHigh,
+                                    contentDescription = null,
+                                    tint = polishColors.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Is this event important?",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = polishColors.text
+                                )
+                            }
+                            Switch(
+                                checked = isImportantEffective,
+                                onCheckedChange = { isImportant = it },
+                                enabled = !hasGoogleMeet,
+                                modifier = Modifier.testTag("is_important_switch"),
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = polishColors.primary,
+                                    uncheckedThumbColor = polishColors.border,
+                                    uncheckedTrackColor = polishColors.background
+                                )
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (hasGoogleMeet) {
+                                "🔒 Google Meet links are important by default. Alarms will ring 1 day and 1 hour before, with a sticky alarm 2 minutes before."
+                            } else if (isImportant) {
+                                "🔥 Marked as important. Alarms will ring 1 day and 1 hour before, with a sticky alarm 2 minutes before."
+                            } else {
+                                "⏱️ Standard importance. Alarms will trigger as standard default notifications with no sticky alarms."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = polishColors.onSurfaceVariant,
                             lineHeight = 16.sp
@@ -1344,10 +1403,11 @@ fun CreateEventCard(
                     } else if (selectedDateTimeMillis <= System.currentTimeMillis()) {
                         Toast.makeText(context, "Please select a date and time in the future.", Toast.LENGTH_SHORT).show()
                     } else {
-                        onAddEvent(title, description, selectedDateTimeMillis, isWorkday)
+                        onAddEvent(title, description, selectedDateTimeMillis, isWorkday, isImportantEffective)
                         // Reset form fields
                         title = ""
                         description = ""
+                        isImportant = false
                         val todayDow = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
                         isWorkday = todayDow != Calendar.FRIDAY && todayDow != Calendar.SATURDAY
                     }

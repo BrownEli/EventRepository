@@ -131,7 +131,7 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun addEvent(title: String, description: String, dateTimeMillis: Long, isWorkday: Boolean) {
+    fun addEvent(title: String, description: String, dateTimeMillis: Long, isWorkday: Boolean, isImportant: Boolean = false) {
         viewModelScope.launch {
             try {
                 val event = Event(
@@ -139,7 +139,8 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
                     description = description,
                     dateTimeMillis = dateTimeMillis,
                     isWorkday = isWorkday,
-                    isEmailSent = false
+                    isEmailSent = false,
+                    isImportant = isImportant
                 )
                 val newId = repository.insert(event)
                 val insertedEvent = event.copy(id = newId.toInt())

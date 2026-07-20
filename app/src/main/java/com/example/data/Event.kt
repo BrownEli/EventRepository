@@ -10,7 +10,8 @@ data class Event(
     val description: String,
     val dateTimeMillis: Long,
     val isWorkday: Boolean, // True if during a workday or breaks a workday
-    val isEmailSent: Boolean = false // Track whether user marked email as sent
+    val isEmailSent: Boolean = false, // Track whether user marked email as sent
+    val isImportant: Boolean = false // Track whether work event is marked as important
 ) {
     val isMeeting: Boolean
         get() = description.contains("meet.google.com", ignoreCase = true) || title.contains("Google Meet", ignoreCase = true)

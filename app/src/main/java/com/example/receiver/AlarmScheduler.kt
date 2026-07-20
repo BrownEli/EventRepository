@@ -43,9 +43,10 @@ class AlarmScheduler(private val context: Context) {
             }
             val dailyDigestTime = cal.timeInMillis
 
-            if (event.hasGoogleMeetLink) {
+            if (event.isImportant || event.hasGoogleMeetLink) {
                 return listOf(
                     Triple("Daily Digest", dailyDigestTime, 6),
+                    Triple("1 Day Before", dateTimeMillis - 1L * 24 * 60 * 60 * 1000, 11),
                     Triple("1 Hour Before", dateTimeMillis - 1L * 60 * 60 * 1000, 9),
                     Triple("2 Minutes Before", dateTimeMillis - 2L * 60 * 1000, 10)
                 )
@@ -160,7 +161,7 @@ class AlarmScheduler(private val context: Context) {
     }
 
     fun cancelAlarmsForEvent(event: Event) {
-        val allOffsets = listOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+        val allOffsets = listOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
         for (codeOffset in allOffsets) {
             val requestCode = event.id * 10 + codeOffset
             val intent = Intent(context, AlarmReceiver::class.java)
