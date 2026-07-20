@@ -26,6 +26,9 @@ class BootReceiver : BroadcastReceiver() {
                         alarmScheduler.scheduleAlarmsForEvent(event)
                     }
                     Log.d("BootReceiver", "Rescheduled alarms for ${events.size} events.")
+
+                    // Reschedule background sync if enabled
+                    com.example.service.SyncWorker.scheduleSync(context)
                 } catch (e: Exception) {
                     Log.e("BootReceiver", "Error rescheduling alarms: ${e.message}", e)
                 } finally {

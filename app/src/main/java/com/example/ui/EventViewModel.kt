@@ -57,6 +57,10 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
             val newValue = !isGcalSyncEnabledState.value
             sharedPrefs.edit().putBoolean("gcal_sync_enabled", newValue).apply()
             isGcalSyncEnabledState.value = newValue
+            
+            // Setup or cancel periodic background sync
+            com.example.service.SyncWorker.scheduleSync(getApplication())
+
             if (newValue) {
                 syncGoogleCalendar(context) { count ->
                     onComplete(count)
@@ -93,6 +97,9 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+        // Setup periodic background sync
+        com.example.service.SyncWorker.scheduleSync(application)
     }
 
     fun toggleWorkEnvironment() {
@@ -101,6 +108,9 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
             sharedPrefs.edit().putBoolean("is_work_environment", newValue).apply()
             isWorkEnvironmentState.value = newValue
             
+            // Reschedule periodic background sync with updated frequency
+            com.example.service.SyncWorker.scheduleSync(getApplication())
+
             // Reschedule all alarms
             rescheduleAllAlarms()
         }
