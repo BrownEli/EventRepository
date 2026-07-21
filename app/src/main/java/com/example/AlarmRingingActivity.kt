@@ -518,7 +518,8 @@ fun AlarmRingingScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(52.dp)
-                            .testTag("ringing_snooze_btn")
+                            .testTag("ringing_snooze_btn"),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -532,10 +533,12 @@ fun AlarmRingingScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Snooze (5m)",
+                                text = "Snooze",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -554,7 +557,8 @@ fun AlarmRingingScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(52.dp)
-                            .testTag("ringing_silence_btn")
+                            .testTag("ringing_silence_btn"),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -568,10 +572,12 @@ fun AlarmRingingScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Silence Sound",
+                                text = "Silence",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = polishColors.text
+                                color = polishColors.text,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
