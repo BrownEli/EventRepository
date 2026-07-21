@@ -34,6 +34,14 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".AlarmRingingActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.MyApplication" />
+
         <service
             android:name=".service.AlarmService"
             android:enabled="true"

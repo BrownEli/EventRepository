@@ -166,6 +166,24 @@ class AlarmService : Service() {
                     val notification = buildAlarmNotification(eventId, eventTitle, reminderLabel, isWorkday, quietSilenced)
                     startForeground(NOTIFICATION_ID, notification)
                 }
+
+                // Automatically launch AlarmRingingActivity if not quiet-silenced and not a Daily Digest
+                if (!quietSilenced && reminderLabel != "Daily Digest") {
+                    val activityIntent = Intent(this, com.example.AlarmRingingActivity::class.java).apply {
+                        setFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        putExtra("EVENT_ID", eventId)
+                        putExtra("REMINDER_LABEL", reminderLabel)
+                        putExtra("EVENT_TITLE", eventTitle)
+                        putExtra("IS_WORKDAY", isWorkday)
+                        putExtra("IS_MEETING", eventHasLink)
+                        putExtra("SILENCED", false)
+                    }
+                    try {
+                        startActivity(activityIntent)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to automatically launch AlarmRingingActivity: ${e.message}", e)
+                    }
+                }
             }
             ACTION_SILENCE -> {
                 stopAlarmSound()
@@ -386,9 +404,14 @@ class AlarmService : Service() {
         isWorkday: Boolean,
         silenced: Boolean
     ): Notification {
-        // Main intent to open app
-        val appIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        // Main intent to open app's custom ringing view
+        val appIntent = Intent(this, com.example.AlarmRingingActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("EVENT_ID", eventId)
+            putExtra("REMINDER_LABEL", reminderLabel)
+            putExtra("EVENT_TITLE", eventTitle)
+            putExtra("IS_WORKDAY", isWorkday)
+            putExtra("SILENCED", silenced)
         }
         val appPendingIntent = PendingIntent.getActivity(
             this,
@@ -397,10 +420,18 @@ class AlarmService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            this,
+            eventId * 10 + 109,
+            appIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         // Notification builders
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentIntent(appPendingIntent)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -597,8 +628,14 @@ class AlarmService : Service() {
         isMeeting: Boolean,
         isImportant: Boolean
     ): Notification {
-        val appIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        val appIntent = Intent(this, com.example.AlarmRingingActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("EVENT_ID", eventId)
+            putExtra("REMINDER_LABEL", reminderLabel)
+            putExtra("EVENT_TITLE", eventTitle)
+            putExtra("IS_WORKDAY", true)
+            putExtra("IS_MEETING", isMeeting)
+            putExtra("SILENCED", silenced)
         }
         val appPendingIntent = PendingIntent.getActivity(
             this,
@@ -607,9 +644,17 @@ class AlarmService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            this,
+            eventId * 10 + 309,
+            appIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentIntent(appPendingIntent)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
