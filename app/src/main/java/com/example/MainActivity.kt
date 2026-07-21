@@ -138,6 +138,10 @@ fun MainScreen(
     val isWorkEnvironment by viewModel.isWorkEnvironment.collectAsStateWithLifecycle()
     val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
     val userName by viewModel.userName.collectAsStateWithLifecycle()
+    val isQuietHoursEnabled by viewModel.isQuietHoursEnabled.collectAsStateWithLifecycle()
+    val quietHoursStart by viewModel.quietHoursStart.collectAsStateWithLifecycle()
+    val quietHoursEnd by viewModel.quietHoursEnd.collectAsStateWithLifecycle()
+    val isQuietHoursChargingRequired by viewModel.isQuietHoursChargingRequired.collectAsStateWithLifecycle()
 
     val filteredEvents = remember(events, isWorkEnvironment) {
         val nowTime = System.currentTimeMillis()
@@ -758,6 +762,14 @@ fun MainScreen(
                 }
                 2 -> {
                     // TAB 2: Settings Screen
+                    val formatHour24 = { hour: Int ->
+                        when {
+                            hour == 0 -> "12 AM"
+                            hour == 12 -> "12 PM"
+                            hour > 12 -> "${hour - 12} PM"
+                            else -> "$hour AM"
+                        }
+                    }
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
@@ -1089,6 +1101,301 @@ fun MainScreen(
                                             uncheckedTrackColor = polishColors.primary.copy(alpha = 0.4f)
                                         )
                                     )
+                                }
+                            }
+                        }
+
+                        // Quiet Sleep Hours Settings Card
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isQuietHoursEnabled) {
+                                        polishColors.primary.copy(alpha = 0.08f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                    }
+                                ),
+                                border = BorderStroke(1.dp, polishColors.border.copy(alpha = 0.4f))
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp)
+                                ) {
+                                    // Header with switch
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .background(
+                                                        if (isQuietHoursEnabled) polishColors.primary.copy(alpha = 0.15f)
+                                                        else polishColors.onSurfaceVariant.copy(alpha = 0.1f),
+                                                        RoundedCornerShape(18.dp)
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.NightsStay,
+                                                    contentDescription = null,
+                                                    tint = if (isQuietHoursEnabled) polishColors.primary else polishColors.onSurfaceVariant,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Quiet Sleep Hours",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isQuietHoursEnabled) polishColors.primary else polishColors.onSurfaceVariant
+                                                )
+                                                Text(
+                                                    text = if (isQuietHoursEnabled) "Silences alarms during designated hours" else "Quiet hours are disabled",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = polishColors.onSurfaceVariant.copy(alpha = 0.8f)
+                                                )
+                                            }
+                                        }
+                                        Switch(
+                                            checked = isQuietHoursEnabled,
+                                            onCheckedChange = { viewModel.toggleQuietHoursEnabled() },
+                                            modifier = Modifier.testTag("quiet_hours_enabled_switch"),
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = polishColors.primary,
+                                                checkedTrackColor = polishColors.primary.copy(alpha = 0.4f)
+                                            )
+                                        )
+                                    }
+
+                                    // Detailed config with smooth slide/fade animation
+                                    AnimatedVisibility(
+                                        visible = isQuietHoursEnabled,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            HorizontalDivider(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                color = polishColors.border.copy(alpha = 0.2f)
+                                            )
+
+                                            // Start Hour Selector
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = "Start Quiet Hours",
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = polishColors.text
+                                                    )
+                                                    Text(
+                                                        text = "When quiet sleep mode begins",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = polishColors.onSurfaceVariant.copy(alpha = 0.7f)
+                                                    )
+                                                }
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    IconButton(
+                                                        onClick = {
+                                                            val newHour = (quietHoursStart + 23) % 24
+                                                            viewModel.setQuietHoursStart(newHour)
+                                                        },
+                                                        modifier = Modifier.size(36.dp).testTag("quiet_start_minus")
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Remove,
+                                                            contentDescription = "Decrease Start Hour",
+                                                            tint = polishColors.primary,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    }
+                                                    Text(
+                                                        text = formatHour24(quietHoursStart),
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = polishColors.text,
+                                                        modifier = Modifier.widthIn(min = 60.dp),
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    IconButton(
+                                                        onClick = {
+                                                            val newHour = (quietHoursStart + 1) % 24
+                                                            viewModel.setQuietHoursStart(newHour)
+                                                        },
+                                                        modifier = Modifier.size(36.dp).testTag("quiet_start_plus")
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Add,
+                                                            contentDescription = "Increase Start Hour",
+                                                            tint = polishColors.primary,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            // End Hour Selector
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = "End Quiet Hours",
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = polishColors.text
+                                                    )
+                                                    Text(
+                                                        text = "When quiet sleep mode stops",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = polishColors.onSurfaceVariant.copy(alpha = 0.7f)
+                                                    )
+                                                }
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    IconButton(
+                                                        onClick = {
+                                                            val newHour = (quietHoursEnd + 23) % 24
+                                                            viewModel.setQuietHoursEnd(newHour)
+                                                        },
+                                                        modifier = Modifier.size(36.dp).testTag("quiet_end_minus")
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Remove,
+                                                            contentDescription = "Decrease End Hour",
+                                                            tint = polishColors.primary,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    }
+                                                    Text(
+                                                        text = formatHour24(quietHoursEnd),
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = polishColors.text,
+                                                        modifier = Modifier.widthIn(min = 60.dp),
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    IconButton(
+                                                        onClick = {
+                                                            val newHour = (quietHoursEnd + 1) % 24
+                                                            viewModel.setQuietHoursEnd(newHour)
+                                                        },
+                                                        modifier = Modifier.size(36.dp).testTag("quiet_end_plus")
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Add,
+                                                            contentDescription = "Increase End Hour",
+                                                            tint = polishColors.primary,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            HorizontalDivider(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                color = polishColors.border.copy(alpha = 0.2f)
+                                            )
+
+                                            // Require charging option
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Bolt,
+                                                        contentDescription = null,
+                                                        tint = if (isQuietHoursChargingRequired) polishColors.primary else polishColors.onSurfaceVariant.copy(alpha = 0.6f),
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Column {
+                                                        Text(
+                                                            text = "Only when charging",
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            fontWeight = FontWeight.Medium,
+                                                            color = polishColors.text
+                                                        )
+                                                        Text(
+                                                            text = "Requires device to be plugged into a charger",
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            color = polishColors.onSurfaceVariant.copy(alpha = 0.7f)
+                                                        )
+                                                    }
+                                                }
+                                                Switch(
+                                                    checked = isQuietHoursChargingRequired,
+                                                    onCheckedChange = { viewModel.toggleQuietHoursChargingRequired() },
+                                                    modifier = Modifier.testTag("quiet_charging_required_switch"),
+                                                    colors = SwitchDefaults.colors(
+                                                        checkedThumbColor = polishColors.primary,
+                                                        checkedTrackColor = polishColors.primary.copy(alpha = 0.4f)
+                                                    )
+                                                )
+                                            }
+
+                                            // Final Summary Box/Banner
+                                            val summaryText = if (isQuietHoursChargingRequired) {
+                                                "🌙 Alarms scheduled between ${formatHour24(quietHoursStart)} and ${formatHour24(quietHoursEnd)} will be completely silenced ONLY when the phone is plugged into a charger."
+                                            } else {
+                                                "🌙 Alarms scheduled between ${formatHour24(quietHoursStart)} and ${formatHour24(quietHoursEnd)} will be completely silenced."
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(
+                                                        polishColors.primary.copy(alpha = 0.05f),
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .border(
+                                                        1.dp,
+                                                        polishColors.primary.copy(alpha = 0.15f),
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .padding(10.dp)
+                                            ) {
+                                                Text(
+                                                    text = summaryText,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = polishColors.primary,
+                                                    lineHeight = 15.sp
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

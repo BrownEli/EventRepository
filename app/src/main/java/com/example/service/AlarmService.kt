@@ -7,9 +7,11 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
 import android.os.VibrationEffect
@@ -88,8 +90,11 @@ class AlarmService : Service() {
                     }
                 }
                 val isEventImportant = eventIsImportant || eventHasLink
+                val quietSilenced = isQuietHoursCharging()
 
-                val shouldPlayAlarm = if (isWorkEnvironment) {
+                val shouldPlayAlarm = if (quietSilenced) {
+                    false
+                } else if (isWorkEnvironment) {
                     isEventImportant && reminderLabel == "2 Minutes Before"
                 } else {
                     true
@@ -101,7 +106,9 @@ class AlarmService : Service() {
                     startVibration()
                 } else if (isWorkEnvironment && reminderLabel != "Daily Digest") {
                     // Alert with a default sound instead of full ongoing alarm
-                    playDefaultNotificationSound()
+                    if (!quietSilenced) {
+                        playDefaultNotificationSound()
+                    }
                 }
 
                 if (isWorkEnvironment) {
@@ -148,7 +155,7 @@ class AlarmService : Service() {
                             eventId = eventId,
                             eventTitle = eventTitle,
                             reminderLabel = reminderLabel,
-                            silenced = false,
+                            silenced = quietSilenced,
                             isMeeting = eventHasLink,
                             isImportant = isEventImportant
                         )
@@ -156,7 +163,7 @@ class AlarmService : Service() {
                     }
                 } else {
                     // Show initial alarm notification (Personal)
-                    val notification = buildAlarmNotification(eventId, eventTitle, reminderLabel, isWorkday, false)
+                    val notification = buildAlarmNotification(eventId, eventTitle, reminderLabel, isWorkday, quietSilenced)
                     startForeground(NOTIFICATION_ID, notification)
                 }
             }
@@ -419,11 +426,20 @@ class AlarmService : Service() {
         builder.setDeleteIntent(deletePendingIntent)
 
         if (silenced) {
-            val title = if (isWorkday) "✉️ Workday Protocol: Mark Email Sent" else "⏰ Personal Protocol: Mark Event Completed"
+            val isQuietCharging = isQuietHoursCharging()
+            val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+            val startHour = prefs.getInt("quiet_hours_start", 22)
+            val endHour = prefs.getInt("quiet_hours_end", 7)
+            val chargingRequired = prefs.getBoolean("quiet_hours_charging_required", true)
+            val chargingSuffix = if (chargingRequired) " (CHARGING)" else ""
+            val quietHeader = if (isQuietCharging) {
+                "🌙 QUIET HOURS ACTIVE$chargingSuffix\nAlarm automatically silenced during quiet hours (${formatHour(startHour)} - ${formatHour(endHour)}).\n\n"
+            } else ""
+            val title = if (isQuietCharging) "🌙 Quiet Hours Silenced: $eventTitle" else if (isWorkday) "✉️ Workday Protocol: Mark Email Sent" else "⏰ Personal Protocol: Mark Event Completed"
             val body = if (isWorkday) {
-                "🛡️ WORKDAY EXCEPTION RUNNING\n\nEvent: $eventTitle\nStatus: Alarm silenced, but notification remains active.\n\n⚠️ Action Required:\nYou must mark the email to your manager as sent to dismiss this notification completely."
+                "${quietHeader}🛡️ WORKDAY EXCEPTION RUNNING\n\nEvent: $eventTitle\nStatus: Alarm silenced, but notification remains active.\n\n⚠️ Action Required:\nYou must mark the email to your manager as sent to dismiss this notification completely."
             } else {
-                "🏡 PERSONAL EVENT ACTIVE\n\nEvent: $eventTitle\nStatus: Alarm silenced, but notification remains active.\n\n⚠️ Action Required:\nYou must mark this event as completed to dismiss this notification completely."
+                "${quietHeader}🏡 PERSONAL EVENT ACTIVE\n\nEvent: $eventTitle\nStatus: Alarm silenced, but notification remains active.\n\n⚠️ Action Required:\nYou must mark this event as completed to dismiss this notification completely."
             }
             val contentText = if (isWorkday) "Workday event: mark email sent to dismiss." else "Personal event: mark completed to dismiss."
             val actionLabel = if (isWorkday) "Mark Email as Sent" else "Mark Event Completed"
@@ -622,11 +638,20 @@ class AlarmService : Service() {
                 .setAutoCancel(false)
 
             if (silenced) {
-                val title = if (isMeeting) "🤝 Join Meeting: $eventTitle" else "💼 Work Event: $eventTitle"
+                val isQuietCharging = isQuietHoursCharging()
+                val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+                val startHour = prefs.getInt("quiet_hours_start", 22)
+                val endHour = prefs.getInt("quiet_hours_end", 7)
+                val chargingRequired = prefs.getBoolean("quiet_hours_charging_required", true)
+                val chargingSuffix = if (chargingRequired) " (CHARGING)" else ""
+                val quietHeader = if (isQuietCharging) {
+                    "🌙 QUIET HOURS ACTIVE$chargingSuffix\nAlarm automatically silenced during quiet hours (${formatHour(startHour)} - ${formatHour(endHour)}).\n\n"
+                } else ""
+                val title = if (isQuietCharging) "🌙 Quiet Hours: $eventTitle" else if (isMeeting) "🤝 Join Meeting: $eventTitle" else "💼 Work Event: $eventTitle"
                 val body = if (isMeeting) {
-                    "🛡️ WORK ENVIRONMENT ACTIVE\n\nMeeting: $eventTitle\nStatus: Alarm silenced, but notification remains active.\n\n⚠️ Action Required:\nYou must join or mark this meeting as joined to dismiss this notification."
+                    "${quietHeader}🛡️ WORK ENVIRONMENT ACTIVE\n\nMeeting: $eventTitle\nStatus: Alarm silenced, but notification remains active.\n\n⚠️ Action Required:\nYou must join or mark this meeting as joined to dismiss this notification."
                 } else {
-                    "🛡️ WORK ENVIRONMENT ACTIVE\n\nEvent: $eventTitle\nStatus: Alarm silenced, but notification remains active.\n\n⚠️ Action Required:\nYou must complete or mark this event as completed to dismiss this notification."
+                    "${quietHeader}🛡️ WORK ENVIRONMENT ACTIVE\n\nEvent: $eventTitle\nStatus: Alarm silenced, but notification remains active.\n\n⚠️ Action Required:\nYou must complete or mark this event as completed to dismiss this notification."
                 }
                 
                 builder.setContentTitle(title)
@@ -807,6 +832,73 @@ class AlarmService : Service() {
             }
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun formatHour(hour: Int): String {
+        return when {
+            hour == 0 -> "12 AM"
+            hour == 12 -> "12 PM"
+            hour > 12 -> "${hour - 12} PM"
+            else -> "$hour AM"
+        }
+    }
+
+    private fun isQuietHoursCharging(): Boolean {
+        val prefs = getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val enabled = prefs.getBoolean("quiet_hours_enabled", true)
+        if (!enabled) {
+            Log.d(TAG, "isQuietHoursCharging: Quiet hours disabled by settings")
+            return false
+        }
+
+        val startHour = prefs.getInt("quiet_hours_start", 22)
+        val endHour = prefs.getInt("quiet_hours_end", 7)
+        val chargingRequired = prefs.getBoolean("quiet_hours_charging_required", true)
+
+        // 1. Check time
+        val calendar = Calendar.getInstance()
+        val hour = calendar.get(Calendar.HOUR_OF_DAY) // 24-hour format
+        val isQuietHours = if (startHour == endHour) {
+            false
+        } else if (startHour < endHour) {
+            hour in startHour until endHour
+        } else {
+            hour >= startHour || hour < endHour
+        }
+
+        if (!isQuietHours) {
+            Log.d(TAG, "isQuietHoursCharging: Not in quiet hours ($hour:00, range: $startHour - $endHour)")
+            return false
+        }
+
+        // 2. Check if plugged into charger (if required)
+        if (!chargingRequired) {
+            Log.d(TAG, "isQuietHoursCharging: Quiet hours active, charging not required.")
+            return true
+        }
+
+        return try {
+            val batteryStatus: Intent? = registerReceiver(
+                null,
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            )
+            val chargePlug = batteryStatus?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
+            val isPlugged = chargePlug == BatteryManager.BATTERY_PLUGGED_AC ||
+                    chargePlug == BatteryManager.BATTERY_PLUGGED_USB ||
+                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 &&
+                            chargePlug == BatteryManager.BATTERY_PLUGGED_WIRELESS)
+            
+            val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+            val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                    status == BatteryManager.BATTERY_STATUS_FULL
+
+            val result = isPlugged || isCharging
+            Log.d(TAG, "isQuietHoursCharging: Quiet hours active. isPlugged=$isPlugged, isCharging=$isCharging -> result=$result")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking battery status: ${e.message}", e)
+            false
         }
     }
 

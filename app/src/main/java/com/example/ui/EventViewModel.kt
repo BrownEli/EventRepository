@@ -52,6 +52,48 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
     )
     val isGcalSyncEnabled: StateFlow<Boolean> = isGcalSyncEnabledState
 
+    val isQuietHoursEnabledState = kotlinx.coroutines.flow.MutableStateFlow(
+        sharedPrefs.getBoolean("quiet_hours_enabled", true)
+    )
+    val isQuietHoursEnabled: StateFlow<Boolean> = isQuietHoursEnabledState
+
+    val quietHoursStartState = kotlinx.coroutines.flow.MutableStateFlow(
+        sharedPrefs.getInt("quiet_hours_start", 22)
+    )
+    val quietHoursStart: StateFlow<Int> = quietHoursStartState
+
+    val quietHoursEndState = kotlinx.coroutines.flow.MutableStateFlow(
+        sharedPrefs.getInt("quiet_hours_end", 7)
+    )
+    val quietHoursEnd: StateFlow<Int> = quietHoursEndState
+
+    val isQuietHoursChargingRequiredState = kotlinx.coroutines.flow.MutableStateFlow(
+        sharedPrefs.getBoolean("quiet_hours_charging_required", true)
+    )
+    val isQuietHoursChargingRequired: StateFlow<Boolean> = isQuietHoursChargingRequiredState
+
+    fun toggleQuietHoursEnabled() {
+        val newValue = !isQuietHoursEnabledState.value
+        sharedPrefs.edit().putBoolean("quiet_hours_enabled", newValue).apply()
+        isQuietHoursEnabledState.value = newValue
+    }
+
+    fun setQuietHoursStart(hour: Int) {
+        sharedPrefs.edit().putInt("quiet_hours_start", hour).apply()
+        quietHoursStartState.value = hour
+    }
+
+    fun setQuietHoursEnd(hour: Int) {
+        sharedPrefs.edit().putInt("quiet_hours_end", hour).apply()
+        quietHoursEndState.value = hour
+    }
+
+    fun toggleQuietHoursChargingRequired() {
+        val newValue = !isQuietHoursChargingRequiredState.value
+        sharedPrefs.edit().putBoolean("quiet_hours_charging_required", newValue).apply()
+        isQuietHoursChargingRequiredState.value = newValue
+    }
+
     fun toggleGcalSync(context: Context, onComplete: (Int) -> Unit = {}) {
         viewModelScope.launch {
             val newValue = !isGcalSyncEnabledState.value
